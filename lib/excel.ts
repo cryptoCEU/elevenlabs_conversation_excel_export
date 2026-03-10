@@ -18,9 +18,7 @@ function getDate(unix: number): string {
     return new Date(unix * 1000).toLocaleDateString("es-ES", {
       day: "2-digit", month: "2-digit", year: "numeric",
     });
-  } catch {
-    return String(unix);
-  }
+  } catch { return String(unix); }
 }
 
 function getTime(unix: number): string {
@@ -29,9 +27,7 @@ function getTime(unix: number): string {
     return new Date(unix * 1000).toLocaleTimeString("es-ES", {
       hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
     });
-  } catch {
-    return "";
-  }
+  } catch { return ""; }
 }
 
 export function buildExcelWorkbook(
@@ -45,30 +41,30 @@ export function buildExcelWorkbook(
     const dur = c.call_duration_secs ?? 0;
 
     return {
-      "Fecha":                    getDate(c.start_time_unix_secs),
-      "Hora":                     getTime(c.start_time_unix_secs),
-      "Cola":                     agentName,
-      "Duración llamada":         fmtDuration(dur),
-      "Tiempo de conversación":   conversationSecs,   // number (seconds)
-      "Tiempo de espera":         waitSecs,            // number (seconds)
-      "ID Conversación":          c.conversation_id,
+      "Fecha":                   getDate(c.start_time_unix_secs),
+      "Hora":                    getTime(c.start_time_unix_secs),
+      "Cola":                    agentName,
+      "Llamante":                c.caller_phone ?? "",   // phone number or blank for chat
+      "Duración llamada":        fmtDuration(dur),
+      "Tiempo de conversación":  conversationSecs,       // seconds (number)
+      "Tiempo de espera":        waitSecs,               // seconds (number)
+      "ID Conversación":         c.conversation_id,
     };
   });
 
   const ws = XLSX.utils.json_to_sheet(rows);
 
-  // Column widths
   ws["!cols"] = [
     { wch: 14 }, // Fecha
     { wch: 10 }, // Hora
     { wch: 28 }, // Cola
+    { wch: 18 }, // Llamante
     { wch: 18 }, // Duración llamada
     { wch: 22 }, // Tiempo de conversación
     { wch: 18 }, // Tiempo de espera
     { wch: 38 }, // ID Conversación
   ];
 
-  // Freeze header row
   ws["!freeze"] = { xSplit: 0, ySplit: 1 };
 
   XLSX.utils.book_append_sheet(wb, ws, "Conversaciones");
