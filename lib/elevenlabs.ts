@@ -10,7 +10,8 @@ export interface ConversationSummary {
   start_time_unix_secs: number;
   call_duration_secs: number;
   message_count: number;
-  caller_phone: string; // empty string if chat / no phone
+  caller_phone: string;  // who called in (from)
+  called_phone: string;  // number that was called (to / agent DID)
   metadata?: Record<string, unknown>;
 }
 
@@ -38,7 +39,58 @@ export interface ConversationsResponse {
   next_cursor?: string;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Phone extraction ──────────────────────────────────────────────────────────
+// Recursively searches all nested objects for phone-like strings.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function findPhone(obj: any, fields: string[]): string {
+  if (!obj || typeof obj !== "object") return "";
+  // Direct field search at this level
+  for (const f of fields) {
+    const v = obj[f];
+    if (typeof v === "string" && v.trim().length > 3 && v !== "null" && v !== "undefined") {
+      return v.trim();
+    }
+  }
+  // Recurse into nested objects (1 level deep to avoid transcript noise)
+  for (const key of Object.keys(obj)) {
+    const child = obj[key];
+    if (child && typeof child === "object" && !Array.isArray(child)) {
+      for (const f of fields) {
+        const v = child[f];
+        if (typeof v === "string" && v.trim().length > 3 && v !== "null" && v !== "undefined") {
+          return v.trim();
+        }
+      }
+    }
+  }
+  return "";
+}
+
+const CALLER_FIELDS = [
+  "caller_id", "caller_phone_number", "caller_phone",
+  "from", "from_number", "from_phone", "phone_from",
+  "caller", "call_from", "originator", "ani",
+  "source_phone", "source_number",
+];
+
+const CALLED_FIELDS = [
+  "called_id", "called_phone_number", "called_phone",
+  "to", "to_number", "to_phone", "phone_to",
+  "callee", "call_to", "destination", "dnis",
+  "destination_phone", "destination_number",
+  "agent_phone_number", "agent_phone",
+  "phone_number_id", "twilio_number", "did",
+];
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractPhones(raw: any): { caller_phone: string; called_phone: string } {
+  return {
+    caller_phone: findPhone(raw, CALLER_FIELDS),
+    called_phone: findPhone(raw, CALLED_FIELDS),
+  };
+}
+
+// ── Numeric field extraction ──────────────────────────────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function pickNumber(raw: any, fields: string[]): number {
   const sources = [raw, raw?.metadata ?? {}];
@@ -57,27 +109,6 @@ function pickNumber(raw: any, fields: string[]): number {
   return 0;
 }
 
-// Searches root + metadata for a phone number string
-// ElevenLabs stores phone in different places depending on integration type
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function pickPhone(raw: any): string {
-  const PHONE_FIELDS = [
-    "caller_id", "caller_phone_number", "caller_phone",
-    "phone_number", "from_number", "from", "phone",
-    "caller", "call_from",
-  ];
-  const sources = [raw, raw?.metadata ?? {}, raw?.call_data ?? {}, raw?.phone_call ?? {}];
-  for (const src of sources) {
-    for (const f of PHONE_FIELDS) {
-      const v = src?.[f];
-      if (typeof v === "string" && v.trim().length > 0 && v !== "null") {
-        return v.trim();
-      }
-    }
-  }
-  return "";
-}
-
 // ── Fetch helpers ─────────────────────────────────────────────────────────────
 export async function fetchConversationsPage(
   apiKey: string, agentId: string, cursor?: string, pageSize = 100
@@ -93,7 +124,7 @@ export async function fetchConversationsPage(
 
   const items: ConversationSummary[] = (raw.conversations ?? raw.items ?? []).map(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (c: any) => ({ ...c, caller_phone: pickPhone(c) })
+    (c: any) => ({ ...c, ...extractPhones(c) })
   );
 
   return { conversations: items, has_more: raw.has_more ?? false, next_cursor: raw.next_cursor };
@@ -127,18 +158,6 @@ export async function fetchConversationDetail(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const raw: any = await res.json();
 
-  // Log structure to Vercel Function Logs for debugging
-  console.log("[detail] top keys:", Object.keys(raw));
-  if (raw.metadata) console.log("[detail] metadata keys:", Object.keys(raw.metadata));
-  console.log("[detail] phone fields:", JSON.stringify({
-    caller_id: raw.caller_id,
-    caller_phone_number: raw.caller_phone_number,
-    phone_number: raw.phone_number,
-    metadata_caller: raw.metadata?.caller_id,
-    metadata_phone: raw.metadata?.phone_number,
-    metadata_from: raw.metadata?.from_number,
-  }));
-
   const startTime = pickNumber(raw, [
     "start_time_unix_secs", "start_time", "created_at_unix_secs",
     "created_at", "started_at", "initiation_time",
@@ -148,6 +167,8 @@ export async function fetchConversationDetail(
     "call_duration", "length_secs", "total_duration_secs",
   ]);
 
+  const { caller_phone, called_phone } = extractPhones(raw);
+
   return {
     ...raw,
     conversation_id: raw.conversation_id ?? conversationId,
@@ -156,7 +177,8 @@ export async function fetchConversationDetail(
     start_time_unix_secs: startTime,
     call_duration_secs: callDuration,
     message_count: raw.message_count ?? raw.transcript?.length ?? 0,
-    caller_phone: pickPhone(raw),
+    caller_phone,
+    called_phone,
     transcript: Array.isArray(raw.transcript) ? raw.transcript : [],
   };
 }
