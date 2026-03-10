@@ -1,5 +1,4 @@
 "use client";
-// v3-supabase-queues — NO loadQueues/saveQueues/createQueue
 import { useState, useCallback, useEffect, useMemo } from "react";
 import {
   Download, RefreshCw, Bot, XCircle, MessageSquare,
@@ -20,6 +19,7 @@ interface Agent { agent_id: string; name: string; }
 interface ConversationSummary {
   conversation_id: string; agent_id: string; status: string;
   start_time_unix_secs: number; call_duration_secs: number; message_count: number;
+  caller_phone: string;
 }
 type Grouping = "dia" | "semana" | "mes";
 type RangePreset = "7d" | "30d" | "90d" | "custom";
@@ -633,7 +633,7 @@ export default function Home() {
                     <div style={{ overflowX: "auto", maxHeight: 460, overflowY: "auto" }}>
                       <table className="data-table">
                         <thead style={{ position: "sticky", top: 0, background: "var(--surface)", zIndex: 1 }}>
-                          <tr><th style={{ width: 40 }}></th><th>Fecha</th><th>Hora</th><th>Cola / Agente</th><th>Duración</th><th>Mensajes</th><th>Estado</th><th>ID</th></tr>
+                          <tr><th style={{ width: 40 }}></th><th>Fecha</th><th>Hora</th><th>Cola / Agente</th><th>Llamante</th><th>Duración</th><th>Mensajes</th><th>Estado</th><th>ID</th></tr>
                         </thead>
                         <tbody>
                           {conversations.map(c => {
@@ -648,6 +648,11 @@ export default function Home() {
                                   {q && <span style={{ fontSize: 11, color: "var(--accent)", fontWeight: 600 }}>{q.name}</span>}
                                   <span style={{ fontSize: 11, color: "var(--muted)" }}>{agents.find(a => a.agent_id === c.agent_id)?.name ?? c.agent_id}</span>
                                 </div></td>
+                                <td className="mono" style={{ fontSize: 12 }}>
+                                  {c.caller_phone
+                                    ? <span>{c.caller_phone}</span>
+                                    : <span style={{ color: "var(--muted)" }}>—</span>}
+                                </td>
                                 <td className="mono" style={{ fontSize: 12 }}>{fmt(c.call_duration_secs)}</td>
                                 <td><div style={{ display: "flex", alignItems: "center", gap: 4 }}><MessageSquare size={12} style={{ color: "var(--muted)" }} /><span className="mono" style={{ fontSize: 12 }}>{c.message_count}</span></div></td>
                                 <td>{(() => { const s = c.status?.toLowerCase(); if (s==="done"||s==="completed") return <span className="tag tag-done">✓ Completada</span>; if (s==="processing") return <span className="tag tag-processing">⟳ Procesando</span>; if (s==="failed"||s==="error") return <span className="tag tag-failed">✗ Error</span>; return <span className="tag tag-default">{c.status}</span>; })()}</td>
