@@ -5,16 +5,20 @@ import { buildExcelWorkbook, workbookToBuffer } from "@/lib/excel";
 
 export async function POST(req: NextRequest) {
   try {
-    const { apiKey, agentName, conversationIds } = await req.json();
-
-    if (!apiKey || !conversationIds?.length) {
+    const apiKey = process.env.ELEVENLABS_API_KEY;
+    if (!apiKey) {
       return NextResponse.json(
-        { error: "Se requieren apiKey y conversationIds" },
-        { status: 400 }
+        { error: "Variable de entorno ELEVENLABS_API_KEY no configurada en Vercel" },
+        { status: 500 }
       );
     }
 
-    // Fetch full detail in batches of 5
+    const { agentName, conversationIds } = await req.json();
+
+    if (!conversationIds?.length) {
+      return NextResponse.json({ error: "Se requieren conversationIds" }, { status: 400 });
+    }
+
     const BATCH = 5;
     const details = [];
     for (let i = 0; i < conversationIds.length; i += BATCH) {
@@ -32,8 +36,7 @@ export async function POST(req: NextRequest) {
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
-        "Content-Type":
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "Content-Disposition": `attachment; filename="conversaciones_${timestamp}.xlsx"`,
       },
     });
