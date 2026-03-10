@@ -4,7 +4,7 @@ import {
   Download, RefreshCw, Bot, XCircle, MessageSquare,
   FileSpreadsheet, Loader2, ExternalLink, Calendar,
   ChevronDown, Search, BarChart2, TableProperties,
-  Layers, Plus, Trash2, Check, X, Pencil,
+  Layers, Plus, Trash2, Check, X, Pencil, AlertCircle,
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, LineChart, Line,
@@ -12,7 +12,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip,
 } from "recharts";
 import type { Queue } from "@/lib/queues";
-import { loadQueues, saveQueues, createQueue, getQueueForAgent } from "@/lib/queues";
+import { getQueueForAgent } from "@/lib/queues";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Agent { agent_id: string; name: string; }
@@ -53,6 +53,27 @@ function sortKey(unix: number, g: Grouping) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+// ── Queue API helpers (client-side) ───────────────────────────────────────────
+async function apiGetQueues(): Promise<Queue[]> {
+  const r = await fetch("/api/queues"); const d = await r.json();
+  if (!r.ok) throw new Error(d.error);
+  return d.queues;
+}
+async function apiCreateQueue(name: string): Promise<Queue> {
+  const r = await fetch("/api/queues", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+  const d = await r.json(); if (!r.ok) throw new Error(d.error);
+  return d.queue;
+}
+async function apiUpdateQueue(id: string, updates: Partial<Queue>): Promise<Queue> {
+  const r = await fetch(`/api/queues/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(updates) });
+  const d = await r.json(); if (!r.ok) throw new Error(d.error);
+  return d.queue;
+}
+async function apiDeleteQueue(id: string): Promise<void> {
+  const r = await fetch(`/api/queues/${id}`, { method: "DELETE" });
+  if (!r.ok) { const d = await r.json(); throw new Error(d.error); }
+}
+
 // ── Chart tooltip ─────────────────────────────────────────────────────────────
 function ChartTooltip({ active, payload, label, unit = "" }: {
   active?: boolean; payload?: { value: number; color: string }[]; label?: string; unit?: string;
@@ -81,8 +102,7 @@ function useStats(conversations: ConversationSummary[], grouping: Grouping) {
     const durBuckets: Record<string, number> = { "<1m": 0, "1-2m": 0, "2-5m": 0, "5-10m": 0, ">10m": 0 };
     for (const c of conversations) {
       const t = c.start_time_unix_secs, dur = c.call_duration_secs ?? 0;
-      const label = groupKey(t, grouping), sk = sortKey(t, grouping);
-      const dt = new Date(t * 1000);
+      const label = groupKey(t, grouping), sk = sortKey(t, grouping), dt = new Date(t * 1000);
       if (!grouped[sk]) grouped[sk] = { label, sk, total: 0, durSum: 0 };
       grouped[sk].total++; grouped[sk].durSum += dur;
       byHour[dt.getHours()] = (byHour[dt.getHours()] ?? 0) + 1;
@@ -112,45 +132,26 @@ const STATUS_COLORS: Record<string, string> = { done: "#22d3a3", completed: "#22
 
 function Pill({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
-    <button onClick={onClick} style={{
-      padding: "5px 14px", borderRadius: 20, border: "1px solid",
-      borderColor: active ? "var(--accent)" : "var(--border)",
-      background: active ? "rgba(108,99,255,0.15)" : "transparent",
-      color: active ? "var(--accent)" : "var(--muted)",
-      fontSize: 12, fontWeight: 600, cursor: "pointer",
-      fontFamily: "'Space Mono', monospace", transition: "all 0.15s", whiteSpace: "nowrap",
-    }}>{label}</button>
+    <button onClick={onClick} style={{ padding: "5px 14px", borderRadius: 20, border: "1px solid", borderColor: active ? "var(--accent)" : "var(--border)", background: active ? "rgba(108,99,255,0.15)" : "transparent", color: active ? "var(--accent)" : "var(--muted)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'Space Mono', monospace", transition: "all 0.15s", whiteSpace: "nowrap" }}>{label}</button>
   );
 }
 
 // ── Agent Dropdown ────────────────────────────────────────────────────────────
-function AgentDropdown({ agents, value, onChange }: {
-  agents: Agent[]; value: Agent | null; onChange: (a: Agent | null) => void;
-}) {
+function AgentDropdown({ agents, value, onChange }: { agents: Agent[]; value: Agent | null; onChange: (a: Agent | null) => void; }) {
   const [open, setOpen] = useState(false);
   return (
     <div style={{ position: "relative" }}>
-      <button onClick={() => setOpen(!open)} style={{
-        width: "100%", background: "#0d0d16", border: "1px solid var(--border)", borderRadius: 8,
-        color: value ? "var(--text)" : "var(--muted)", padding: "10px 14px",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        cursor: "pointer", fontSize: 13, fontFamily: "'Space Mono', monospace",
-      }}>
-        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {value ? value.name : "Seleccionar agente..."}
-        </span>
+      <button onClick={() => setOpen(!open)} style={{ width: "100%", background: "#0d0d16", border: "1px solid var(--border)", borderRadius: 8, color: value ? "var(--text)" : "var(--muted)", padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", fontSize: 13, fontFamily: "'Space Mono', monospace" }}>
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value ? value.name : "Seleccionar agente..."}</span>
         <ChevronDown size={14} style={{ flexShrink: 0, marginLeft: 8, color: "var(--muted)", transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
       </button>
       {open && (
         <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, background: "#111118", border: "1px solid var(--border)", borderRadius: 8, zIndex: 100, overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}>
-          {agents.map(a => {
-            return (
-              <button key={a.agent_id} onClick={() => { onChange(a); setOpen(false); }}
-                style={{ width: "100%", padding: "10px 14px", textAlign: "left", background: value?.agent_id === a.agent_id ? "rgba(108,99,255,0.12)" : "transparent", color: value?.agent_id === a.agent_id ? "var(--accent)" : "var(--text)", border: "none", cursor: "pointer", fontSize: 13, fontFamily: "'DM Sans', sans-serif", borderBottom: "1px solid rgba(30,30,46,0.6)", display: "flex", alignItems: "center", gap: 8 }}>
-                <Bot size={13} style={{ color: "var(--muted)", flexShrink: 0 }} />{a.name}
-              </button>
-            );
-          })}
+          {agents.map(a => (
+            <button key={a.agent_id} onClick={() => { onChange(a); setOpen(false); }} style={{ width: "100%", padding: "10px 14px", textAlign: "left", background: value?.agent_id === a.agent_id ? "rgba(108,99,255,0.12)" : "transparent", color: value?.agent_id === a.agent_id ? "var(--accent)" : "var(--text)", border: "none", cursor: "pointer", fontSize: 13, fontFamily: "'DM Sans', sans-serif", borderBottom: "1px solid rgba(30,30,46,0.6)", display: "flex", alignItems: "center", gap: 8 }}>
+              <Bot size={13} style={{ color: "var(--muted)", flexShrink: 0 }} />{a.name}
+            </button>
+          ))}
         </div>
       )}
     </div>
@@ -158,46 +159,69 @@ function AgentDropdown({ agents, value, onChange }: {
 }
 
 // ── Queue Manager ─────────────────────────────────────────────────────────────
-function QueueManager({ queues, agents, onChange }: {
-  queues: Queue[]; agents: Agent[]; onChange: (qs: Queue[]) => void;
+function QueueManager({ queues, agents, onQueuesChange }: {
+  queues: Queue[]; agents: Agent[]; onQueuesChange: () => void;
 }) {
   const [newName, setNewName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [saving, setSaving] = useState<string | null>(null); // id of queue being saved
+  const [error, setError] = useState("");
 
-  function addQueue() {
+  async function addQueue() {
     if (!newName.trim()) return;
-    const updated = [...queues, createQueue(newName)];
-    onChange(updated); setNewName("");
+    setSaving("new"); setError("");
+    try {
+      await apiCreateQueue(newName);
+      setNewName(""); onQueuesChange();
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Error"); }
+    finally { setSaving(null); }
   }
-  function deleteQueue(id: string) { onChange(queues.filter(q => q.id !== id)); }
-  function renameQueue(id: string) {
+
+  async function deleteQueue(id: string) {
+    setSaving(id); setError("");
+    try { await apiDeleteQueue(id); onQueuesChange(); }
+    catch (e: unknown) { setError(e instanceof Error ? e.message : "Error"); }
+    finally { setSaving(null); }
+  }
+
+  async function renameQueue(id: string) {
     if (!editName.trim()) return;
-    onChange(queues.map(q => q.id === id ? { ...q, name: editName.trim() } : q));
-    setEditingId(null);
+    setSaving(id); setError("");
+    try { await apiUpdateQueue(id, { name: editName.trim() }); setEditingId(null); onQueuesChange(); }
+    catch (e: unknown) { setError(e instanceof Error ? e.message : "Error"); }
+    finally { setSaving(null); }
   }
-  function toggleAgent(queueId: string, agentId: string) {
-    onChange(queues.map(q => {
-      if (q.id !== queueId) return q;
-      const has = q.agentIds.includes(agentId);
-      return { ...q, agentIds: has ? q.agentIds.filter(id => id !== agentId) : [...q.agentIds, agentId] };
-    }));
+
+  async function toggleAgent(queue: Queue, agentId: string) {
+    setSaving(queue.id); setError("");
+    const has = queue.agent_ids.includes(agentId);
+    const newIds = has ? queue.agent_ids.filter(id => id !== agentId) : [...queue.agent_ids, agentId];
+    try { await apiUpdateQueue(queue.id, { agent_ids: newIds }); onQueuesChange(); }
+    catch (e: unknown) { setError(e instanceof Error ? e.message : "Error"); }
+    finally { setSaving(null); }
   }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {error && (
+        <div style={{ padding: "12px 16px", background: "rgba(255,101,132,0.08)", border: "1px solid rgba(255,101,132,0.2)", borderRadius: 8, color: "var(--accent2)", fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
+          <XCircle size={14} /> {error}
+        </div>
+      )}
+
       {/* Create */}
       <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 24 }}>
         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Nueva cola</div>
         <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 16 }}>
-          Crea una cola y asigna agentes de ElevenLabs. La cola será el nombre que aparece en la columna <strong style={{ color: "var(--text)" }}>Cola</strong> del Excel exportado.
+          El nombre de la cola aparecerá en la columna <strong style={{ color: "var(--text)" }}>Cola</strong> del Excel exportado. Los datos se guardan en Supabase.
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           <input className="input" placeholder="Ej: Soporte técnico, Ventas, Recepción..." value={newName}
             onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === "Enter" && addQueue()} style={{ flex: 1 }} />
-          <button className="btn-primary" onClick={addQueue} disabled={!newName.trim()}
+          <button className="btn-primary" onClick={addQueue} disabled={!newName.trim() || saving === "new"}
             style={{ display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
-            <Plus size={14} /> Crear cola
+            {saving === "new" ? <Loader2 size={14} className="spinner" /> : <Plus size={14} />} Crear cola
           </button>
         </div>
       </div>
@@ -206,75 +230,86 @@ function QueueManager({ queues, agents, onChange }: {
         <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 40, textAlign: "center", color: "var(--muted)" }}>
           <Layers size={32} style={{ margin: "0 auto 12px", opacity: 0.3 }} />
           <div style={{ fontSize: 14 }}>No hay colas creadas todavía.</div>
-          <div style={{ fontSize: 12, marginTop: 4 }}>Crea una cola y asigna agentes para poder exportar con el nombre de cola correcto.</div>
+          <div style={{ fontSize: 12, marginTop: 4 }}>Crea una cola y asigna agentes para exportar con el nombre correcto.</div>
         </div>
       )}
 
-      {queues.map(queue => (
-        <div key={queue.id} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
-          <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            {editingId === queue.id ? (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
-                <input className="input" value={editName} onChange={e => setEditName(e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter") renameQueue(queue.id); if (e.key === "Escape") setEditingId(null); }}
-                  style={{ maxWidth: 280 }} autoFocus />
-                <button onClick={() => renameQueue(queue.id)} style={{ background: "var(--success)", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer" }}>
-                  <Check size={13} color="white" />
-                </button>
-                <button onClick={() => setEditingId(null)} style={{ background: "rgba(255,101,132,0.15)", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer" }}>
-                  <X size={13} color="var(--accent2)" />
-                </button>
-              </div>
-            ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <Layers size={15} style={{ color: "var(--accent)" }} />
-                <span style={{ fontWeight: 600, fontSize: 14 }}>{queue.name}</span>
-                <span style={{ fontSize: 11, color: "var(--muted)", fontFamily: "monospace" }}>{queue.agentIds.length} agente{queue.agentIds.length !== 1 ? "s" : ""}</span>
-              </div>
-            )}
-            {editingId !== queue.id && (
-              <div style={{ display: "flex", gap: 6 }}>
-                <button onClick={() => { setEditingId(queue.id); setEditName(queue.name); }}
-                  style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "var(--muted)", display: "flex" }}>
-                  <Pencil size={12} />
-                </button>
-                <button onClick={() => deleteQueue(queue.id)}
-                  style={{ background: "rgba(255,101,132,0.08)", border: "1px solid rgba(255,101,132,0.2)", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "var(--accent2)", display: "flex" }}>
-                  <Trash2 size={12} />
-                </button>
-              </div>
-            )}
-          </div>
-          <div style={{ padding: 20 }}>
-            <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 12, letterSpacing: "0.05em" }}>
-              AGENTES ASIGNADOS — haz clic para asignar / desasignar
-            </div>
-            {agents.length === 0
-              ? <div style={{ fontSize: 12, color: "var(--muted)" }}>Recarga la página para cargar los agentes.</div>
-              : (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {agents.map(agent => {
-                    const assigned = queue.agentIds.includes(agent.agent_id);
-                    const otherQ = !assigned && getQueueForAgent(queues, agent.agent_id);
-                    return (
-                      <button key={agent.agent_id} onClick={() => toggleAgent(queue.id, agent.agent_id)}
-                        title={otherQ ? `Ya en: ${otherQ.name}` : ""}
-                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "1px solid", transition: "all 0.15s", cursor: "pointer", fontSize: 12,
-                          borderColor: assigned ? "var(--success)" : otherQ ? "var(--warning)" : "var(--border)",
-                          background: assigned ? "rgba(34,211,163,0.1)" : otherQ ? "rgba(245,158,11,0.08)" : "rgba(255,255,255,0.02)",
-                          color: assigned ? "var(--success)" : otherQ ? "var(--warning)" : "var(--text)",
-                        }}>
-                        {assigned ? <Check size={12} /> : <Bot size={12} style={{ color: "var(--muted)" }} />}
-                        {agent.name}
-                        {otherQ && <span style={{ fontSize: 10 }}>({otherQ.name})</span>}
-                      </button>
-                    );
-                  })}
+      {queues.map(queue => {
+        const isSaving = saving === queue.id;
+        return (
+          <div key={queue.id} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", opacity: isSaving ? 0.7 : 1, transition: "opacity 0.2s" }}>
+            {/* Header */}
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              {editingId === queue.id ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
+                  <input className="input" value={editName} onChange={e => setEditName(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") renameQueue(queue.id); if (e.key === "Escape") setEditingId(null); }}
+                    style={{ maxWidth: 280 }} autoFocus />
+                  <button onClick={() => renameQueue(queue.id)} disabled={isSaving}
+                    style={{ background: "var(--success)", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer", display: "flex" }}>
+                    {isSaving ? <Loader2 size={13} className="spinner" color="white" /> : <Check size={13} color="white" />}
+                  </button>
+                  <button onClick={() => setEditingId(null)} style={{ background: "rgba(255,101,132,0.15)", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer", display: "flex" }}>
+                    <X size={13} color="var(--accent2)" />
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  {isSaving && <Loader2 size={13} className="spinner" style={{ color: "var(--accent)" }} />}
+                  <Layers size={15} style={{ color: "var(--accent)" }} />
+                  <span style={{ fontWeight: 600, fontSize: 14 }}>{queue.name}</span>
+                  <span style={{ fontSize: 11, color: "var(--muted)", fontFamily: "monospace" }}>
+                    {queue.agent_ids.length} agente{queue.agent_ids.length !== 1 ? "s" : ""}
+                  </span>
                 </div>
               )}
+              {editingId !== queue.id && (
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button onClick={() => { setEditingId(queue.id); setEditName(queue.name); }}
+                    style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "var(--muted)", display: "flex" }}>
+                    <Pencil size={12} />
+                  </button>
+                  <button onClick={() => deleteQueue(queue.id)} disabled={isSaving}
+                    style={{ background: "rgba(255,101,132,0.08)", border: "1px solid rgba(255,101,132,0.2)", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "var(--accent2)", display: "flex" }}>
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Agent assignment */}
+            <div style={{ padding: 20 }}>
+              <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 12, letterSpacing: "0.05em" }}>
+                AGENTES ASIGNADOS — haz clic para asignar / desasignar
+              </div>
+              {agents.length === 0
+                ? <div style={{ fontSize: 12, color: "var(--muted)", display: "flex", alignItems: "center", gap: 6 }}>
+                    <AlertCircle size={13} /> Recarga los agentes usando el botón del header.
+                  </div>
+                : (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {agents.map(agent => {
+                      const assigned = queue.agent_ids.includes(agent.agent_id);
+                      const otherQ = !assigned && getQueueForAgent(queues, agent.agent_id);
+                      return (
+                        <button key={agent.agent_id} onClick={() => toggleAgent(queue, agent.agent_id)} disabled={isSaving}
+                          title={otherQ ? `Ya en: ${otherQ.name}` : ""}
+                          style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "1px solid", transition: "all 0.15s", cursor: "pointer", fontSize: 12,
+                            borderColor: assigned ? "var(--success)" : otherQ ? "var(--warning)" : "var(--border)",
+                            background: assigned ? "rgba(34,211,163,0.1)" : otherQ ? "rgba(245,158,11,0.08)" : "rgba(255,255,255,0.02)",
+                            color: assigned ? "var(--success)" : otherQ ? "var(--warning)" : "var(--text)" }}>
+                          {assigned ? <Check size={12} /> : <Bot size={12} style={{ color: "var(--muted)" }} />}
+                          {agent.name}
+                          {otherQ && <span style={{ fontSize: 10, opacity: 0.8 }}>({otherQ.name})</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -293,15 +328,22 @@ export default function Home() {
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loadingAgents, setLoadingAgents] = useState(false);
+  const [loadingQueues, setLoadingQueues] = useState(false);
   const [loadingConvs, setLoadingConvs] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
   const [fetched, setFetched] = useState(false);
-
   const stats = useStats(conversations, grouping);
 
+  const fetchQueues = useCallback(async () => {
+    setLoadingQueues(true);
+    try { setQueues(await apiGetQueues()); }
+    catch (e: unknown) { setError(e instanceof Error ? e.message : "Error cargando colas"); }
+    finally { setLoadingQueues(false); }
+  }, []);
+
   useEffect(() => {
-    const q = loadQueues(); setQueues(q); saveQueues(q);
+    fetchQueues();
     loadAgents();
   }, []);
 
@@ -315,71 +357,50 @@ export default function Home() {
     if (p !== "custom") { const d = presetDates(p); setDateFrom(d.from); setDateTo(d.to); }
   }
 
-  function handleQueuesChange(qs: Queue[]) { setQueues(qs); saveQueues(qs); }
-
   const loadAgents = useCallback(async () => {
     setLoadingAgents(true); setError("");
-    try {
-      const res = await fetch("/api/agents");
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setAgents(data.agents);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Error al cargar agentes");
-    } finally { setLoadingAgents(false); }
+    try { const r = await fetch("/api/agents"); const d = await r.json(); if (!r.ok) throw new Error(d.error); setAgents(d.agents); }
+    catch (e: unknown) { setError(e instanceof Error ? e.message : "Error al cargar agentes"); }
+    finally { setLoadingAgents(false); }
   }, []);
 
   const loadConversations = useCallback(async () => {
     if (!selectedAgent) { setError("Selecciona un agente."); return; }
     setLoadingConvs(true); setError(""); setConversations([]); setSelected(new Set()); setFetched(false);
     try {
-      const res = await fetch("/api/conversations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agentId: selectedAgent.agent_id, dateFrom, dateTo }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setConversations(data.conversations);
-      setSelected(new Set(data.conversations.map((c: ConversationSummary) => c.conversation_id)));
+      const r = await fetch("/api/conversations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ agentId: selectedAgent.agent_id, dateFrom, dateTo }) });
+      const d = await r.json(); if (!r.ok) throw new Error(d.error);
+      setConversations(d.conversations);
+      setSelected(new Set(d.conversations.map((c: ConversationSummary) => c.conversation_id)));
       setFetched(true);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Error al cargar conversaciones");
-    } finally { setLoadingConvs(false); }
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Error"); }
+    finally { setLoadingConvs(false); }
   }, [selectedAgent, dateFrom, dateTo]);
 
   const exportExcel = useCallback(async () => {
     if (selected.size === 0) { setError("Selecciona al menos una conversación."); return; }
-    // Cola name: from queue assignment, or agent name as fallback
     const queueName = selectedAgent ? (getQueueForAgent(queues, selectedAgent.agent_id)?.name ?? selectedAgent.name) : "Agente";
     setExporting(true); setError("");
     try {
-      const res = await fetch("/api/export", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agentName: queueName, conversationIds: Array.from(selected) }),
-      });
-      if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
-      const blob = await res.blob();
+      const r = await fetch("/api/export", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ agentName: queueName, conversationIds: Array.from(selected) }) });
+      if (!r.ok) { const d = await r.json(); throw new Error(d.error); }
+      const blob = await r.blob();
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
+      const a = document.createElement("a"); a.href = url;
       a.download = `conversaciones_${queueName.replace(/\s+/g, "_")}_${dateFrom}_${dateTo}.xlsx`;
       a.click(); URL.revokeObjectURL(url);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Error al exportar");
-    } finally { setExporting(false); }
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Error"); }
+    finally { setExporting(false); }
   }, [selectedAgent, queues, selected, dateFrom, dateTo]);
 
-  const toggleSelect = (id: string) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleSelect = (id: string) => setSelected(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleAll = () => setSelected(selected.size === conversations.length ? new Set() : new Set(conversations.map(c => c.conversation_id)));
   const allSelected = conversations.length > 0 && selected.size === conversations.length;
-
-  const card = (extra?: React.CSSProperties) => ({ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, ...extra });
+  const card = (e?: React.CSSProperties) => ({ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, ...e });
+  const selectedQueue = selectedAgent ? getQueueForAgent(queues, selectedAgent.agent_id) : undefined;
 
   return (
     <div className="gradient-bg min-h-screen">
-      {/* Header */}
       <header style={{ borderBottom: "1px solid var(--border)" }}>
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -393,74 +414,55 @@ export default function Home() {
           </div>
           <div style={{ display: "flex", gap: 10 }}>
             <button onClick={loadAgents} className="btn-ghost" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }} disabled={loadingAgents}>
-              {loadingAgents ? <Loader2 size={13} className="spinner" /> : <RefreshCw size={13} />}
-              Recargar agentes
+              {loadingAgents ? <Loader2 size={13} className="spinner" /> : <RefreshCw size={13} />} Recargar agentes
             </button>
-            <a href="https://elevenlabs.io/app/conversational-ai" target="_blank" rel="noopener noreferrer"
-              className="btn-ghost" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+            <a href="https://elevenlabs.io/app/conversational-ai" target="_blank" rel="noopener noreferrer" className="btn-ghost" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
               ElevenLabs <ExternalLink size={12} />
             </a>
           </div>
         </div>
         <div className="max-w-7xl mx-auto px-6" style={{ display: "flex", borderTop: "1px solid var(--border)" }}>
           {([["datos", TableProperties, "Datos"], ["colas", Layers, "Gestión de Colas"]] as const).map(([tab, Icon, label]) => (
-            <button key={tab} onClick={() => setMainTab(tab)} style={{
-              display: "flex", alignItems: "center", gap: 6, padding: "12px 20px", border: "none",
-              borderBottom: mainTab === tab ? "2px solid var(--accent)" : "2px solid transparent",
-              background: "transparent", color: mainTab === tab ? "var(--accent)" : "var(--muted)",
-              fontSize: 13, fontWeight: 500, cursor: "pointer", transition: "all 0.15s", marginBottom: -1,
-            }}>
+            <button key={tab} onClick={() => setMainTab(tab)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "12px 20px", border: "none", borderBottom: mainTab === tab ? "2px solid var(--accent)" : "2px solid transparent", background: "transparent", color: mainTab === tab ? "var(--accent)" : "var(--muted)", fontSize: 13, fontWeight: 500, cursor: "pointer", transition: "all 0.15s", marginBottom: -1 }}>
               <Icon size={14} />{label}
+              {tab === "colas" && loadingQueues && <Loader2 size={11} className="spinner" style={{ marginLeft: 4 }} />}
             </button>
           ))}
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-
         {error && (
           <div className="fade-up" style={{ padding: "12px 16px", background: "rgba(255,101,132,0.08)", border: "1px solid rgba(255,101,132,0.2)", borderRadius: 8, color: "var(--accent2)", fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
             <XCircle size={14} /> {error}
           </div>
         )}
 
-        {/* ══ COLAS TAB ══ */}
+        {/* ══ COLAS ══ */}
         {mainTab === "colas" && (
-          <QueueManager queues={queues} agents={agents} onChange={handleQueuesChange} />
+          <QueueManager queues={queues} agents={agents} onQueuesChange={fetchQueues} />
         )}
 
-        {/* ══ DATOS TAB ══ */}
+        {/* ══ DATOS ══ */}
         {mainTab === "datos" && (
           <>
-            {/* Filters — agent + range only */}
             <div style={card({ padding: 24 })} className="fade-up">
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 20, alignItems: "flex-end" }}>
-
-                {/* Agent selector */}
+                {/* Agent */}
                 <div>
                   <label style={{ fontSize: 11, color: "var(--muted)", display: "block", marginBottom: 6 }}>AGENTE</label>
                   {loadingAgents
-                    ? <div style={{ padding: "10px 14px", background: "#0d0d16", border: "1px solid var(--border)", borderRadius: 8, color: "var(--muted)", fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
-                        <Loader2 size={13} className="spinner" />Cargando agentes...
-                      </div>
+                    ? <div style={{ padding: "10px 14px", background: "#0d0d16", border: "1px solid var(--border)", borderRadius: 8, color: "var(--muted)", fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}><Loader2 size={13} className="spinner" />Cargando agentes...</div>
                     : <AgentDropdown agents={agents} value={selectedAgent} onChange={a => { setSelectedAgent(a); setFetched(false); setConversations([]); }} />
                   }
-                  {/* Show queue badge if agent has one */}
-                  {selectedAgent && (() => {
-                    const q = getQueueForAgent(queues, selectedAgent.agent_id);
-                    return q ? (
-                      <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 6, fontSize: 11 }}>
-                        <Layers size={11} style={{ color: "var(--accent)" }} />
-                        <span style={{ color: "var(--muted)" }}>Cola:</span>
-                        <span style={{ color: "var(--accent)", fontWeight: 600 }}>{q.name}</span>
-                        <span style={{ color: "var(--muted)" }}>→ se usará en el Excel</span>
-                      </div>
-                    ) : (
-                      <div style={{ marginTop: 8, fontSize: 11, color: "var(--warning)" }}>
-                        ⚠ Sin cola asignada — se usará el nombre del agente. Asigna en <button onClick={() => setMainTab("colas")} style={{ background: "none", border: "none", color: "var(--warning)", cursor: "pointer", textDecoration: "underline", fontSize: 11, padding: 0 }}>Gestión de Colas</button>.
-                      </div>
-                    );
-                  })()}
+                  {selectedAgent && (
+                    <div style={{ marginTop: 8, fontSize: 11, display: "flex", alignItems: "center", gap: 6 }}>
+                      {selectedQueue
+                        ? <><Layers size={11} style={{ color: "var(--accent)" }} /><span style={{ color: "var(--muted)" }}>Cola:</span><span style={{ color: "var(--accent)", fontWeight: 600 }}>{selectedQueue.name}</span><span style={{ color: "var(--muted)" }}>→ aparecerá en el Excel</span></>
+                        : <><AlertCircle size={11} style={{ color: "var(--warning)" }} /><span style={{ color: "var(--warning)" }}>Sin cola asignada — se usará el nombre del agente.</span><button onClick={() => setMainTab("colas")} style={{ background: "none", border: "none", color: "var(--warning)", cursor: "pointer", textDecoration: "underline", fontSize: 11, padding: 0 }}>Asignar cola →</button></>
+                      }
+                    </div>
+                  )}
                 </div>
 
                 {/* Range */}
@@ -492,7 +494,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* KPIs */}
             {fetched && conversations.length > 0 && stats && (
               <>
                 <div className="fade-up" style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12 }}>
@@ -510,7 +511,6 @@ export default function Home() {
                   ))}
                 </div>
 
-                {/* Sub tabs */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <div style={{ display: "flex", gap: 4, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: 4 }}>
                     {([["tabla", TableProperties, "Tabla"], ["graficos", BarChart2, "Gráficos"]] as const).map(([tab, Icon, label]) => (
@@ -531,7 +531,6 @@ export default function Home() {
                   )}
                 </div>
 
-                {/* Charts */}
                 {dataTab === "graficos" && (
                   <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
@@ -540,12 +539,12 @@ export default function Home() {
                         <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 20 }}>Volumen de conversaciones</div>
                         <ResponsiveContainer width="100%" height={220}>
                           <AreaChart data={stats.groupedData}>
-                            <defs><linearGradient id="gLL" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#6c63ff" stopOpacity={0.3} /><stop offset="95%" stopColor="#6c63ff" stopOpacity={0} /></linearGradient></defs>
-                            <CartesianGrid stroke="#1e1e2e" strokeDasharray="3 3" />
-                            <XAxis dataKey="date" tick={{ fill: "#6b6b8a", fontSize: 10 }} axisLine={false} tickLine={false} />
-                            <YAxis tick={{ fill: "#6b6b8a", fontSize: 10 }} axisLine={false} tickLine={false} />
-                            <Tooltip content={<ChartTooltip unit=" llamadas" />} />
-                            <Area type="monotone" dataKey="llamadas" stroke="#6c63ff" strokeWidth={2} fill="url(#gLL)" />
+                            <defs><linearGradient id="gLL" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#6c63ff" stopOpacity={0.3}/><stop offset="95%" stopColor="#6c63ff" stopOpacity={0}/></linearGradient></defs>
+                            <CartesianGrid stroke="#1e1e2e" strokeDasharray="3 3"/>
+                            <XAxis dataKey="date" tick={{ fill:"#6b6b8a", fontSize:10 }} axisLine={false} tickLine={false}/>
+                            <YAxis tick={{ fill:"#6b6b8a", fontSize:10 }} axisLine={false} tickLine={false}/>
+                            <Tooltip content={<ChartTooltip unit=" llamadas"/>}/>
+                            <Area type="monotone" dataKey="llamadas" stroke="#6c63ff" strokeWidth={2} fill="url(#gLL)"/>
                           </AreaChart>
                         </ResponsiveContainer>
                       </div>
@@ -554,11 +553,11 @@ export default function Home() {
                         <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 20 }}>Minutos de media</div>
                         <ResponsiveContainer width="100%" height={220}>
                           <LineChart data={stats.groupedData}>
-                            <CartesianGrid stroke="#1e1e2e" strokeDasharray="3 3" />
-                            <XAxis dataKey="date" tick={{ fill: "#6b6b8a", fontSize: 10 }} axisLine={false} tickLine={false} />
-                            <YAxis tick={{ fill: "#6b6b8a", fontSize: 10 }} axisLine={false} tickLine={false} unit="m" />
-                            <Tooltip content={<ChartTooltip unit="m" />} />
-                            <Line type="monotone" dataKey="durMedia" stroke="#22d3a3" strokeWidth={2} dot={{ fill: "#22d3a3", r: 3 }} activeDot={{ r: 5 }} />
+                            <CartesianGrid stroke="#1e1e2e" strokeDasharray="3 3"/>
+                            <XAxis dataKey="date" tick={{ fill:"#6b6b8a", fontSize:10 }} axisLine={false} tickLine={false}/>
+                            <YAxis tick={{ fill:"#6b6b8a", fontSize:10 }} axisLine={false} tickLine={false} unit="m"/>
+                            <Tooltip content={<ChartTooltip unit="m"/>}/>
+                            <Line type="monotone" dataKey="durMedia" stroke="#22d3a3" strokeWidth={2} dot={{ fill:"#22d3a3", r:3 }} activeDot={{ r:5 }}/>
                           </LineChart>
                         </ResponsiveContainer>
                       </div>
@@ -569,13 +568,11 @@ export default function Home() {
                         <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 20 }}>Distribución horaria</div>
                         <ResponsiveContainer width="100%" height={200}>
                           <BarChart data={stats.hourData}>
-                            <CartesianGrid stroke="#1e1e2e" strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="hora" tick={{ fill: "#6b6b8a", fontSize: 9 }} axisLine={false} tickLine={false} interval={2} />
-                            <YAxis tick={{ fill: "#6b6b8a", fontSize: 10 }} axisLine={false} tickLine={false} />
-                            <Tooltip content={<ChartTooltip unit=" llamadas" />} />
-                            <Bar dataKey="llamadas" radius={[4, 4, 0, 0]}>
-                              {stats.hourData.map((e, i) => { const mx = Math.max(...stats.hourData.map(d => d.llamadas)); return <Cell key={i} fill={e.llamadas === mx && mx > 0 ? "#6c63ff" : "#2a2a4a"} />; })}
-                            </Bar>
+                            <CartesianGrid stroke="#1e1e2e" strokeDasharray="3 3" vertical={false}/>
+                            <XAxis dataKey="hora" tick={{ fill:"#6b6b8a", fontSize:9 }} axisLine={false} tickLine={false} interval={2}/>
+                            <YAxis tick={{ fill:"#6b6b8a", fontSize:10 }} axisLine={false} tickLine={false}/>
+                            <Tooltip content={<ChartTooltip unit=" llamadas"/>}/>
+                            <Bar dataKey="llamadas" radius={[4,4,0,0]}>{stats.hourData.map((e,i)=>{ const mx=Math.max(...stats.hourData.map(d=>d.llamadas)); return <Cell key={i} fill={e.llamadas===mx&&mx>0?"#6c63ff":"#2a2a4a"}/>; })}</Bar>
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
@@ -583,21 +580,15 @@ export default function Home() {
                         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Estado</div>
                         <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 16 }}>Resultado llamadas</div>
                         <ResponsiveContainer width="100%" height={160}>
-                          <PieChart>
-                            <Pie data={stats.statusData} dataKey="value" cx="50%" cy="50%" outerRadius={65} innerRadius={35} paddingAngle={3}>
-                              {stats.statusData.map((e, i) => <Cell key={i} fill={STATUS_COLORS[e.name] ?? COLORS[i % COLORS.length]} />)}
-                            </Pie>
-                            <Tooltip content={<ChartTooltip unit=" llamadas" />} />
-                          </PieChart>
+                          <PieChart><Pie data={stats.statusData} dataKey="value" cx="50%" cy="50%" outerRadius={65} innerRadius={35} paddingAngle={3}>
+                            {stats.statusData.map((e,i)=><Cell key={i} fill={STATUS_COLORS[e.name]??COLORS[i%COLORS.length]}/>)}
+                          </Pie><Tooltip content={<ChartTooltip unit=" llamadas"/>}/></PieChart>
                         </ResponsiveContainer>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8 }}>
-                          {stats.statusData.map((s, i) => (
-                            <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11 }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                <span style={{ width: 8, height: 8, borderRadius: "50%", background: STATUS_COLORS[s.name] ?? COLORS[i % COLORS.length], display: "inline-block" }} />
-                                <span style={{ color: "var(--muted)" }}>{s.name}</span>
-                              </div>
-                              <span style={{ fontFamily: "monospace" }}>{s.value}</span>
+                        <div style={{ display:"flex", flexDirection:"column", gap:4, marginTop:8 }}>
+                          {stats.statusData.map((s,i)=>(
+                            <div key={i} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", fontSize:11 }}>
+                              <div style={{ display:"flex", alignItems:"center", gap:6 }}><span style={{ width:8, height:8, borderRadius:"50%", background:STATUS_COLORS[s.name]??COLORS[i%COLORS.length], display:"inline-block" }}/><span style={{ color:"var(--muted)" }}>{s.name}</span></div>
+                              <span style={{ fontFamily:"monospace" }}>{s.value}</span>
                             </div>
                           ))}
                         </div>
@@ -607,22 +598,17 @@ export default function Home() {
                         <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 16 }}>Por rangos</div>
                         <ResponsiveContainer width="100%" height={160}>
                           <BarChart data={stats.durData} layout="vertical">
-                            <XAxis type="number" tick={{ fill: "#6b6b8a", fontSize: 9 }} axisLine={false} tickLine={false} />
-                            <YAxis type="category" dataKey="name" tick={{ fill: "#6b6b8a", fontSize: 10 }} axisLine={false} tickLine={false} width={36} />
-                            <Tooltip content={<ChartTooltip unit=" llamadas" />} />
-                            <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                              {stats.durData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                            </Bar>
+                            <XAxis type="number" tick={{ fill:"#6b6b8a", fontSize:9 }} axisLine={false} tickLine={false}/>
+                            <YAxis type="category" dataKey="name" tick={{ fill:"#6b6b8a", fontSize:10 }} axisLine={false} tickLine={false} width={36}/>
+                            <Tooltip content={<ChartTooltip unit=" llamadas"/>}/>
+                            <Bar dataKey="value" radius={[0,4,4,0]}>{stats.durData.map((_,i)=><Cell key={i} fill={COLORS[i%COLORS.length]}/>)}</Bar>
                           </BarChart>
                         </ResponsiveContainer>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8 }}>
-                          {stats.durData.map((d, i) => (
-                            <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11 }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                <span style={{ width: 8, height: 8, borderRadius: 2, background: COLORS[i % COLORS.length], display: "inline-block" }} />
-                                <span style={{ color: "var(--muted)" }}>{d.name}</span>
-                              </div>
-                              <span style={{ fontFamily: "monospace" }}>{d.value}</span>
+                        <div style={{ display:"flex", flexDirection:"column", gap:4, marginTop:8 }}>
+                          {stats.durData.map((d,i)=>(
+                            <div key={i} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", fontSize:11 }}>
+                              <div style={{ display:"flex", alignItems:"center", gap:6 }}><span style={{ width:8, height:8, borderRadius:2, background:COLORS[i%COLORS.length], display:"inline-block" }}/><span style={{ color:"var(--muted)" }}>{d.name}</span></div>
+                              <span style={{ fontFamily:"monospace" }}>{d.value}</span>
                             </div>
                           ))}
                         </div>
@@ -631,7 +617,6 @@ export default function Home() {
                   </div>
                 )}
 
-                {/* Table */}
                 {dataTab === "tabla" && (
                   <div style={card({ overflow: "hidden" })} className="fade-up">
                     <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -639,8 +624,7 @@ export default function Home() {
                         <input type="checkbox" checked={allSelected} onChange={toggleAll} style={{ accentColor: "var(--accent)", width: 15, height: 15 }} />
                         <span style={{ fontSize: 13, color: "var(--muted)" }}>{selected.size} de {conversations.length} seleccionadas</span>
                       </div>
-                      <button className="btn-success" onClick={exportExcel} disabled={exporting || selected.size === 0}
-                        style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <button className="btn-success" onClick={exportExcel} disabled={exporting || selected.size === 0} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         {exporting ? <Loader2 size={14} className="spinner" /> : <Download size={14} />}
                         {exporting ? "Exportando..." : `Exportar ${selected.size} a Excel`}
                       </button>
@@ -648,7 +632,7 @@ export default function Home() {
                     <div style={{ overflowX: "auto", maxHeight: 460, overflowY: "auto" }}>
                       <table className="data-table">
                         <thead style={{ position: "sticky", top: 0, background: "var(--surface)", zIndex: 1 }}>
-                          <tr><th style={{ width: 40 }}></th><th>Fecha</th><th>Hora</th><th>Cola</th><th>Duración</th><th>Mensajes</th><th>Estado</th><th>ID</th></tr>
+                          <tr><th style={{ width: 40 }}></th><th>Fecha</th><th>Hora</th><th>Cola / Agente</th><th>Duración</th><th>Mensajes</th><th>Estado</th><th>ID</th></tr>
                         </thead>
                         <tbody>
                           {conversations.map(c => {
@@ -660,13 +644,13 @@ export default function Home() {
                                 <td className="mono" style={{ fontSize: 12 }}>{dt.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" })}</td>
                                 <td className="mono" style={{ fontSize: 12 }}>{dt.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</td>
                                 <td><div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                                  {q ? <span style={{ fontSize: 11, color: "var(--accent)", fontWeight: 600 }}>{q.name}</span> : null}
+                                  {q && <span style={{ fontSize: 11, color: "var(--accent)", fontWeight: 600 }}>{q.name}</span>}
                                   <span style={{ fontSize: 11, color: "var(--muted)" }}>{agents.find(a => a.agent_id === c.agent_id)?.name ?? c.agent_id}</span>
                                 </div></td>
                                 <td className="mono" style={{ fontSize: 12 }}>{fmt(c.call_duration_secs)}</td>
                                 <td><div style={{ display: "flex", alignItems: "center", gap: 4 }}><MessageSquare size={12} style={{ color: "var(--muted)" }} /><span className="mono" style={{ fontSize: 12 }}>{c.message_count}</span></div></td>
-                                <td>{(() => { const s = c.status?.toLowerCase(); if (s === "done" || s === "completed") return <span className="tag tag-done">✓ Completada</span>; if (s === "processing") return <span className="tag tag-processing">⟳ Procesando</span>; if (s === "failed" || s === "error") return <span className="tag tag-failed">✗ Error</span>; return <span className="tag tag-default">{c.status}</span>; })()}</td>
-                                <td className="mono" style={{ fontSize: 10, color: "var(--muted)" }}>{c.conversation_id.slice(0, 20)}…</td>
+                                <td>{(() => { const s = c.status?.toLowerCase(); if (s==="done"||s==="completed") return <span className="tag tag-done">✓ Completada</span>; if (s==="processing") return <span className="tag tag-processing">⟳ Procesando</span>; if (s==="failed"||s==="error") return <span className="tag tag-failed">✗ Error</span>; return <span className="tag tag-default">{c.status}</span>; })()}</td>
+                                <td className="mono" style={{ fontSize: 10, color: "var(--muted)" }}>{c.conversation_id.slice(0,20)}…</td>
                               </tr>
                             );
                           })}
@@ -677,7 +661,6 @@ export default function Home() {
                 )}
               </>
             )}
-
             {fetched && conversations.length === 0 && !loadingConvs && (
               <div style={card({ padding: 48, textAlign: "center" })} className="fade-up">
                 <MessageSquare size={32} style={{ margin: "0 auto 12px", opacity: 0.3, color: "var(--muted)" }} />
@@ -693,9 +676,8 @@ export default function Home() {
           </>
         )}
       </main>
-
       <footer style={{ borderTop: "1px solid var(--border)", padding: "16px 24px", textAlign: "center", fontSize: 11, color: "var(--muted)", marginTop: 32 }}>
-        <span className="mono">ElevenLabs Exporter</span> · Las colas se guardan en tu navegador
+        <span className="mono">ElevenLabs Exporter</span> · Colas guardadas en Supabase
       </footer>
     </div>
   );
