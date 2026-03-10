@@ -49,10 +49,7 @@ function groupKey(unix: number, g: Grouping) {
 function sortKey(unix: number, g: Grouping) {
   const d = new Date(unix * 1000);
   if (g === "dia") return toISO(d);
-  if (g === "semana") {
-    const t = new Date(d); t.setDate(t.getDate() - ((t.getDay() + 6) % 7));
-    return toISO(t);
-  }
+  if (g === "semana") { const t = new Date(d); t.setDate(t.getDate() - ((t.getDay() + 6) % 7)); return toISO(t); }
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
@@ -74,7 +71,7 @@ function ChartTooltip({ active, payload, label, unit = "" }: {
   );
 }
 
-// ── Stats hook ────────────────────────────────────────────────────────────────
+// ── Stats ─────────────────────────────────────────────────────────────────────
 function useStats(conversations: ConversationSummary[], grouping: Grouping) {
   return useMemo(() => {
     if (!conversations.length) return null;
@@ -113,7 +110,6 @@ function useStats(conversations: ConversationSummary[], grouping: Grouping) {
 const COLORS = ["#6c63ff", "#22d3a3", "#ff6584", "#f59e0b", "#60a5fa"];
 const STATUS_COLORS: Record<string, string> = { done: "#22d3a3", completed: "#22d3a3", processing: "#f59e0b", failed: "#ff6584", error: "#ff6584" };
 
-// ── Pill ──────────────────────────────────────────────────────────────────────
 function Pill({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
     <button onClick={onClick} style={{
@@ -128,8 +124,8 @@ function Pill({ label, active, onClick }: { label: string; active: boolean; onCl
 }
 
 // ── Agent Dropdown ────────────────────────────────────────────────────────────
-function AgentDropdown({ agents, value, onChange, placeholder = "Seleccionar agente..." }: {
-  agents: Agent[]; value: Agent | null; onChange: (a: Agent | null) => void; placeholder?: string;
+function AgentDropdown({ agents, value, onChange }: {
+  agents: Agent[]; value: Agent | null; onChange: (a: Agent | null) => void;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -141,63 +137,27 @@ function AgentDropdown({ agents, value, onChange, placeholder = "Seleccionar age
         cursor: "pointer", fontSize: 13, fontFamily: "'Space Mono', monospace",
       }}>
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {value ? value.name : placeholder}
+          {value ? value.name : "Seleccionar agente..."}
         </span>
         <ChevronDown size={14} style={{ flexShrink: 0, marginLeft: 8, color: "var(--muted)", transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
       </button>
       {open && (
         <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, background: "#111118", border: "1px solid var(--border)", borderRadius: 8, zIndex: 100, overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}>
-          {agents.map(a => (
-            <button key={a.agent_id} onClick={() => { onChange(a); setOpen(false); }}
-              style={{ width: "100%", padding: "10px 14px", textAlign: "left", background: value?.agent_id === a.agent_id ? "rgba(108,99,255,0.12)" : "transparent", color: value?.agent_id === a.agent_id ? "var(--accent)" : "var(--text)", border: "none", cursor: "pointer", fontSize: 13, fontFamily: "'DM Sans', sans-serif", borderBottom: "1px solid rgba(30,30,46,0.6)", display: "flex", alignItems: "center", gap: 8 }}>
-              <Bot size={13} style={{ color: "var(--muted)", flexShrink: 0 }} />{a.name}
-            </button>
-          ))}
+          {agents.map(a => {
+            return (
+              <button key={a.agent_id} onClick={() => { onChange(a); setOpen(false); }}
+                style={{ width: "100%", padding: "10px 14px", textAlign: "left", background: value?.agent_id === a.agent_id ? "rgba(108,99,255,0.12)" : "transparent", color: value?.agent_id === a.agent_id ? "var(--accent)" : "var(--text)", border: "none", cursor: "pointer", fontSize: 13, fontFamily: "'DM Sans', sans-serif", borderBottom: "1px solid rgba(30,30,46,0.6)", display: "flex", alignItems: "center", gap: 8 }}>
+                <Bot size={13} style={{ color: "var(--muted)", flexShrink: 0 }} />{a.name}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
 
-// ── Queue Dropdown ────────────────────────────────────────────────────────────
-function QueueDropdown({ queues, value, onChange, placeholder = "Seleccionar cola..." }: {
-  queues: Queue[]; value: Queue | null; onChange: (q: Queue | null) => void; placeholder?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div style={{ position: "relative" }}>
-      <button onClick={() => setOpen(!open)} style={{
-        width: "100%", background: "#0d0d16", border: "1px solid var(--border)", borderRadius: 8,
-        color: value ? "var(--text)" : "var(--muted)", padding: "10px 14px",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        cursor: "pointer", fontSize: 13, fontFamily: "'Space Mono', monospace",
-      }}>
-        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {value ? value.name : placeholder}
-        </span>
-        <ChevronDown size={14} style={{ flexShrink: 0, marginLeft: 8, color: "var(--muted)", transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
-      </button>
-      {open && (
-        <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, background: "#111118", border: "1px solid var(--border)", borderRadius: 8, zIndex: 100, overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}>
-          {queues.length === 0 && (
-            <div style={{ padding: "12px 14px", fontSize: 12, color: "var(--muted)" }}>No hay colas creadas</div>
-          )}
-          {queues.map(q => (
-            <button key={q.id} onClick={() => { onChange(q); setOpen(false); }}
-              style={{ width: "100%", padding: "10px 14px", textAlign: "left", background: value?.id === q.id ? "rgba(108,99,255,0.12)" : "transparent", color: value?.id === q.id ? "var(--accent)" : "var(--text)", border: "none", cursor: "pointer", fontSize: 13, fontFamily: "'DM Sans', sans-serif", borderBottom: "1px solid rgba(30,30,46,0.6)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <Layers size={13} style={{ color: "var(--muted)", flexShrink: 0 }} />{q.name}
-              </div>
-              <span style={{ fontSize: 10, color: "var(--muted)", fontFamily: "monospace" }}>{q.agentIds.length} agente{q.agentIds.length !== 1 ? "s" : ""}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Queue Management Panel ────────────────────────────────────────────────────
+// ── Queue Manager ─────────────────────────────────────────────────────────────
 function QueueManager({ queues, agents, onChange }: {
   queues: Queue[]; agents: Agent[]; onChange: (qs: Queue[]) => void;
 }) {
@@ -208,44 +168,33 @@ function QueueManager({ queues, agents, onChange }: {
   function addQueue() {
     if (!newName.trim()) return;
     const updated = [...queues, createQueue(newName)];
-    onChange(updated); saveQueues(updated); setNewName("");
+    onChange(updated); setNewName("");
   }
-
-  function deleteQueue(id: string) {
-    const updated = queues.filter(q => q.id !== id);
-    onChange(updated); saveQueues(updated);
-  }
-
+  function deleteQueue(id: string) { onChange(queues.filter(q => q.id !== id)); }
   function renameQueue(id: string) {
     if (!editName.trim()) return;
-    const updated = queues.map(q => q.id === id ? { ...q, name: editName.trim() } : q);
-    onChange(updated); saveQueues(updated); setEditingId(null);
+    onChange(queues.map(q => q.id === id ? { ...q, name: editName.trim() } : q));
+    setEditingId(null);
   }
-
-  function toggleAgentInQueue(queueId: string, agentId: string) {
-    const updated = queues.map(q => {
+  function toggleAgent(queueId: string, agentId: string) {
+    onChange(queues.map(q => {
       if (q.id !== queueId) return q;
       const has = q.agentIds.includes(agentId);
       return { ...q, agentIds: has ? q.agentIds.filter(id => id !== agentId) : [...q.agentIds, agentId] };
-    });
-    onChange(updated); saveQueues(updated);
+    }));
   }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* Create new queue */}
+      {/* Create */}
       <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 24 }}>
         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Nueva cola</div>
-        <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 16 }}>Crea una cola y asigna agentes de ElevenLabs a ella</div>
+        <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 16 }}>
+          Crea una cola y asigna agentes de ElevenLabs. La cola será el nombre que aparece en la columna <strong style={{ color: "var(--text)" }}>Cola</strong> del Excel exportado.
+        </div>
         <div style={{ display: "flex", gap: 10 }}>
-          <input
-            className="input"
-            placeholder="Ej: Soporte técnico, Ventas, Recepción..."
-            value={newName}
-            onChange={e => setNewName(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && addQueue()}
-            style={{ flex: 1 }}
-          />
+          <input className="input" placeholder="Ej: Soporte técnico, Ventas, Recepción..." value={newName}
+            onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === "Enter" && addQueue()} style={{ flex: 1 }} />
           <button className="btn-primary" onClick={addQueue} disabled={!newName.trim()}
             style={{ display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
             <Plus size={14} /> Crear cola
@@ -253,33 +202,26 @@ function QueueManager({ queues, agents, onChange }: {
         </div>
       </div>
 
-      {/* Queue list */}
       {queues.length === 0 && (
         <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 40, textAlign: "center", color: "var(--muted)" }}>
           <Layers size={32} style={{ margin: "0 auto 12px", opacity: 0.3 }} />
           <div style={{ fontSize: 14 }}>No hay colas creadas todavía.</div>
-          <div style={{ fontSize: 12, marginTop: 4 }}>Crea una cola para asignar agentes a ella.</div>
+          <div style={{ fontSize: 12, marginTop: 4 }}>Crea una cola y asigna agentes para poder exportar con el nombre de cola correcto.</div>
         </div>
       )}
 
       {queues.map(queue => (
         <div key={queue.id} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
-          {/* Queue header */}
           <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             {editingId === queue.id ? (
               <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
-                <input
-                  className="input"
-                  value={editName}
-                  onChange={e => setEditName(e.target.value)}
+                <input className="input" value={editName} onChange={e => setEditName(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter") renameQueue(queue.id); if (e.key === "Escape") setEditingId(null); }}
-                  style={{ maxWidth: 280 }}
-                  autoFocus
-                />
-                <button onClick={() => renameQueue(queue.id)} style={{ background: "var(--success)", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer", display: "flex", alignItems: "center" }}>
+                  style={{ maxWidth: 280 }} autoFocus />
+                <button onClick={() => renameQueue(queue.id)} style={{ background: "var(--success)", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer" }}>
                   <Check size={13} color="white" />
                 </button>
-                <button onClick={() => setEditingId(null)} style={{ background: "rgba(255,101,132,0.15)", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer", display: "flex", alignItems: "center" }}>
+                <button onClick={() => setEditingId(null)} style={{ background: "rgba(255,101,132,0.15)", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer" }}>
                   <X size={13} color="var(--accent2)" />
                 </button>
               </div>
@@ -293,46 +235,43 @@ function QueueManager({ queues, agents, onChange }: {
             {editingId !== queue.id && (
               <div style={{ display: "flex", gap: 6 }}>
                 <button onClick={() => { setEditingId(queue.id); setEditName(queue.name); }}
-                  style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: 6, padding: "6px 10px", cursor: "pointer", display: "flex", alignItems: "center", color: "var(--muted)" }}>
+                  style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "var(--muted)", display: "flex" }}>
                   <Pencil size={12} />
                 </button>
                 <button onClick={() => deleteQueue(queue.id)}
-                  style={{ background: "rgba(255,101,132,0.08)", border: "1px solid rgba(255,101,132,0.2)", borderRadius: 6, padding: "6px 10px", cursor: "pointer", display: "flex", alignItems: "center", color: "var(--accent2)" }}>
+                  style={{ background: "rgba(255,101,132,0.08)", border: "1px solid rgba(255,101,132,0.2)", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "var(--accent2)", display: "flex" }}>
                   <Trash2 size={12} />
                 </button>
               </div>
             )}
           </div>
-
-          {/* Agent assignment */}
           <div style={{ padding: 20 }}>
-            <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 12, letterSpacing: "0.05em" }}>AGENTES ASIGNADOS</div>
-            {agents.length === 0 && (
-              <div style={{ fontSize: 12, color: "var(--muted)" }}>Carga los agentes primero desde la pestaña Datos.</div>
-            )}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {agents.map(agent => {
-                const assigned = queue.agentIds.includes(agent.agent_id);
-                const otherQueue = !assigned && getQueueForAgent(queues, agent.agent_id);
-                return (
-                  <button key={agent.agent_id}
-                    onClick={() => toggleAgentInQueue(queue.id, agent.agent_id)}
-                    title={otherQueue ? `Asignado a: ${otherQueue.name}` : ""}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 6, padding: "7px 14px",
-                      borderRadius: 8, border: "1px solid",
-                      borderColor: assigned ? "var(--success)" : otherQueue ? "var(--warning)" : "var(--border)",
-                      background: assigned ? "rgba(34,211,163,0.1)" : otherQueue ? "rgba(245,158,11,0.08)" : "rgba(255,255,255,0.02)",
-                      color: assigned ? "var(--success)" : otherQueue ? "var(--warning)" : "var(--text)",
-                      cursor: "pointer", fontSize: 12, transition: "all 0.15s",
-                    }}>
-                    {assigned ? <Check size={12} /> : <Bot size={12} style={{ color: "var(--muted)" }} />}
-                    {agent.name}
-                    {otherQueue && <span style={{ fontSize: 10, color: "var(--warning)" }}>({otherQueue.name})</span>}
-                  </button>
-                );
-              })}
+            <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 12, letterSpacing: "0.05em" }}>
+              AGENTES ASIGNADOS — haz clic para asignar / desasignar
             </div>
+            {agents.length === 0
+              ? <div style={{ fontSize: 12, color: "var(--muted)" }}>Recarga la página para cargar los agentes.</div>
+              : (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {agents.map(agent => {
+                    const assigned = queue.agentIds.includes(agent.agent_id);
+                    const otherQ = !assigned && getQueueForAgent(queues, agent.agent_id);
+                    return (
+                      <button key={agent.agent_id} onClick={() => toggleAgent(queue.id, agent.agent_id)}
+                        title={otherQ ? `Ya en: ${otherQ.name}` : ""}
+                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "1px solid", transition: "all 0.15s", cursor: "pointer", fontSize: 12,
+                          borderColor: assigned ? "var(--success)" : otherQ ? "var(--warning)" : "var(--border)",
+                          background: assigned ? "rgba(34,211,163,0.1)" : otherQ ? "rgba(245,158,11,0.08)" : "rgba(255,255,255,0.02)",
+                          color: assigned ? "var(--success)" : otherQ ? "var(--warning)" : "var(--text)",
+                        }}>
+                        {assigned ? <Check size={12} /> : <Bot size={12} style={{ color: "var(--muted)" }} />}
+                        {agent.name}
+                        {otherQ && <span style={{ fontSize: 10 }}>({otherQ.name})</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
           </div>
         </div>
       ))}
@@ -344,7 +283,6 @@ function QueueManager({ queues, agents, onChange }: {
 export default function Home() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [queues, setQueues] = useState<Queue[]>([]);
-  const [selectedQueue, setSelectedQueue] = useState<Queue | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [mainTab, setMainTab] = useState<MainTab>("datos");
   const [dataTab, setDataTab] = useState<"tabla" | "graficos">("tabla");
@@ -362,20 +300,13 @@ export default function Home() {
 
   const stats = useStats(conversations, grouping);
 
-  // Agents in selected queue
-  const queueAgents = useMemo(() =>
-    selectedQueue ? agents.filter(a => selectedQueue.agentIds.includes(a.agent_id)) : [],
-    [selectedQueue, agents]
-  );
-
   useEffect(() => {
-    setQueues(loadQueues());
+    const q = loadQueues(); setQueues(q); saveQueues(q);
     loadAgents();
   }, []);
 
   useEffect(() => {
-    if (preset === "7d") setGrouping("dia");
-    else if (preset === "30d") setGrouping("dia");
+    if (preset === "7d" || preset === "30d") setGrouping("dia");
     else if (preset === "90d") setGrouping("semana");
   }, [preset]);
 
@@ -383,6 +314,8 @@ export default function Home() {
     setPreset(p);
     if (p !== "custom") { const d = presetDates(p); setDateFrom(d.from); setDateTo(d.to); }
   }
+
+  function handleQueuesChange(qs: Queue[]) { setQueues(qs); saveQueues(qs); }
 
   const loadAgents = useCallback(async () => {
     setLoadingAgents(true); setError("");
@@ -397,75 +330,52 @@ export default function Home() {
   }, []);
 
   const loadConversations = useCallback(async () => {
-    // Collect agent IDs to query
-    let agentIds: string[] = [];
-    let colName = "Agente";
-
-    if (selectedQueue) {
-      agentIds = selectedQueue.agentIds;
-      colName = selectedQueue.name;
-      if (agentIds.length === 0) { setError("La cola seleccionada no tiene agentes asignados."); return; }
-    } else if (selectedAgent) {
-      agentIds = [selectedAgent.agent_id];
-      colName = getQueueForAgent(queues, selectedAgent.agent_id)?.name ?? selectedAgent.name;
-    } else {
-      setError("Selecciona una cola o un agente."); return;
-    }
-
+    if (!selectedAgent) { setError("Selecciona un agente."); return; }
     setLoadingConvs(true); setError(""); setConversations([]); setSelected(new Set()); setFetched(false);
     try {
-      const allConvs: ConversationSummary[] = [];
-      for (const agentId of agentIds) {
-        const res = await fetch("/api/conversations", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ agentId, dateFrom, dateTo }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
-        allConvs.push(...data.conversations);
-      }
-      // Sort by date desc
-      allConvs.sort((a, b) => b.start_time_unix_secs - a.start_time_unix_secs);
-      setConversations(allConvs);
-      setSelected(new Set(allConvs.map(c => c.conversation_id)));
+      const res = await fetch("/api/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agentId: selectedAgent.agent_id, dateFrom, dateTo }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setConversations(data.conversations);
+      setSelected(new Set(data.conversations.map((c: ConversationSummary) => c.conversation_id)));
       setFetched(true);
-      // Store colName for export
-      sessionStorage.setItem("export_col_name", colName);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Error al cargar conversaciones");
     } finally { setLoadingConvs(false); }
-  }, [selectedQueue, selectedAgent, queues, dateFrom, dateTo]);
+  }, [selectedAgent, dateFrom, dateTo]);
 
   const exportExcel = useCallback(async () => {
     if (selected.size === 0) { setError("Selecciona al menos una conversación."); return; }
-    const colName = sessionStorage.getItem("export_col_name") ?? "Agente";
+    // Cola name: from queue assignment, or agent name as fallback
+    const queueName = selectedAgent ? (getQueueForAgent(queues, selectedAgent.agent_id)?.name ?? selectedAgent.name) : "Agente";
     setExporting(true); setError("");
     try {
       const res = await fetch("/api/export", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agentName: colName, conversationIds: Array.from(selected) }),
+        body: JSON.stringify({ agentName: queueName, conversationIds: Array.from(selected) }),
       });
       if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `conversaciones_${colName.replace(/\s+/g, "_")}_${dateFrom}_${dateTo}.xlsx`;
+      a.download = `conversaciones_${queueName.replace(/\s+/g, "_")}_${dateFrom}_${dateTo}.xlsx`;
       a.click(); URL.revokeObjectURL(url);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Error al exportar");
     } finally { setExporting(false); }
-  }, [selected, dateFrom, dateTo]);
+  }, [selectedAgent, queues, selected, dateFrom, dateTo]);
 
   const toggleSelect = (id: string) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleAll = () => setSelected(selected.size === conversations.length ? new Set() : new Set(conversations.map(c => c.conversation_id)));
   const allSelected = conversations.length > 0 && selected.size === conversations.length;
 
   const card = (extra?: React.CSSProperties) => ({ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, ...extra });
-
-  const agentName = (agentId: string) => agents.find(a => a.agent_id === agentId)?.name ?? agentId;
 
   return (
     <div className="gradient-bg min-h-screen">
@@ -492,16 +402,13 @@ export default function Home() {
             </a>
           </div>
         </div>
-
-        {/* Main nav tabs */}
-        <div className="max-w-7xl mx-auto px-6" style={{ display: "flex", gap: 0, borderTop: "1px solid var(--border)" }}>
+        <div className="max-w-7xl mx-auto px-6" style={{ display: "flex", borderTop: "1px solid var(--border)" }}>
           {([["datos", TableProperties, "Datos"], ["colas", Layers, "Gestión de Colas"]] as const).map(([tab, Icon, label]) => (
             <button key={tab} onClick={() => setMainTab(tab)} style={{
-              display: "flex", alignItems: "center", gap: 6, padding: "12px 20px",
-              border: "none", borderBottom: mainTab === tab ? "2px solid var(--accent)" : "2px solid transparent",
+              display: "flex", alignItems: "center", gap: 6, padding: "12px 20px", border: "none",
+              borderBottom: mainTab === tab ? "2px solid var(--accent)" : "2px solid transparent",
               background: "transparent", color: mainTab === tab ? "var(--accent)" : "var(--muted)",
-              fontSize: 13, fontWeight: 500, cursor: "pointer", transition: "all 0.15s",
-              marginBottom: -1,
+              fontSize: 13, fontWeight: 500, cursor: "pointer", transition: "all 0.15s", marginBottom: -1,
             }}>
               <Icon size={14} />{label}
             </button>
@@ -517,57 +424,47 @@ export default function Home() {
           </div>
         )}
 
-        {/* ══════════ QUEUE MANAGER TAB ══════════ */}
+        {/* ══ COLAS TAB ══ */}
         {mainTab === "colas" && (
-          <QueueManager queues={queues} agents={agents} onChange={qs => { setQueues(qs); saveQueues(qs); }} />
+          <QueueManager queues={queues} agents={agents} onChange={handleQueuesChange} />
         )}
 
-        {/* ══════════ DATA TAB ══════════ */}
+        {/* ══ DATOS TAB ══ */}
         {mainTab === "datos" && (
           <>
-            {/* Filters */}
+            {/* Filters — agent + range only */}
             <div style={card({ padding: 24 })} className="fade-up">
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 20 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 20, alignItems: "flex-end" }}>
 
-                {/* Left block: queue + agent */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  <div>
-                    <label style={{ fontSize: 11, color: "var(--muted)", display: "block", marginBottom: 6 }}>
-                      COLA <span style={{ color: "var(--border)" }}>— filtra todos los agentes asignados</span>
-                    </label>
-                    {loadingAgents
-                      ? <div style={{ padding: "10px 14px", background: "#0d0d16", border: "1px solid var(--border)", borderRadius: 8, color: "var(--muted)", fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}><Loader2 size={13} className="spinner" />Cargando...</div>
-                      : <QueueDropdown queues={queues} value={selectedQueue} onChange={q => { setSelectedQueue(q); if (q) setSelectedAgent(null); setFetched(false); setConversations([]); }} />
-                    }
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
-                    <span style={{ fontSize: 11, color: "var(--muted)" }}>o</span>
-                    <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: 11, color: "var(--muted)", display: "block", marginBottom: 6 }}>
-                      AGENTE INDIVIDUAL
-                    </label>
-                    {loadingAgents
-                      ? <div style={{ padding: "10px 14px", background: "#0d0d16", border: "1px solid var(--border)", borderRadius: 8, color: "var(--muted)", fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}><Loader2 size={13} className="spinner" />Cargando...</div>
-                      : <AgentDropdown agents={agents} value={selectedAgent} onChange={a => { setSelectedAgent(a); if (a) setSelectedQueue(null); setFetched(false); setConversations([]); }} />
-                    }
-                  </div>
-                  {/* Show agents in selected queue */}
-                  {selectedQueue && queueAgents.length > 0 && (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {queueAgents.map(a => (
-                        <span key={a.agent_id} style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 10px", background: "rgba(108,99,255,0.1)", borderRadius: 20, fontSize: 11, color: "var(--accent)" }}>
-                          <Bot size={10} />{a.name}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                {/* Agent selector */}
+                <div>
+                  <label style={{ fontSize: 11, color: "var(--muted)", display: "block", marginBottom: 6 }}>AGENTE</label>
+                  {loadingAgents
+                    ? <div style={{ padding: "10px 14px", background: "#0d0d16", border: "1px solid var(--border)", borderRadius: 8, color: "var(--muted)", fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
+                        <Loader2 size={13} className="spinner" />Cargando agentes...
+                      </div>
+                    : <AgentDropdown agents={agents} value={selectedAgent} onChange={a => { setSelectedAgent(a); setFetched(false); setConversations([]); }} />
+                  }
+                  {/* Show queue badge if agent has one */}
+                  {selectedAgent && (() => {
+                    const q = getQueueForAgent(queues, selectedAgent.agent_id);
+                    return q ? (
+                      <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 6, fontSize: 11 }}>
+                        <Layers size={11} style={{ color: "var(--accent)" }} />
+                        <span style={{ color: "var(--muted)" }}>Cola:</span>
+                        <span style={{ color: "var(--accent)", fontWeight: 600 }}>{q.name}</span>
+                        <span style={{ color: "var(--muted)" }}>→ se usará en el Excel</span>
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: 8, fontSize: 11, color: "var(--warning)" }}>
+                        ⚠ Sin cola asignada — se usará el nombre del agente. Asigna en <button onClick={() => setMainTab("colas")} style={{ background: "none", border: "none", color: "var(--warning)", cursor: "pointer", textDecoration: "underline", fontSize: 11, padding: 0 }}>Gestión de Colas</button>.
+                      </div>
+                    );
+                  })()}
                 </div>
 
-                {/* Right block: range + dates */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {/* Range */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   <label style={{ fontSize: 11, color: "var(--muted)" }}>RANGO</label>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     {(["7d", "30d", "90d", "custom"] as RangePreset[]).map(p => (
@@ -587,14 +484,11 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Search button */}
-                <div style={{ display: "flex", alignItems: "flex-end" }}>
-                  <button className="btn-primary" onClick={loadConversations} disabled={loadingConvs || (!selectedQueue && !selectedAgent)}
-                    style={{ display: "flex", alignItems: "center", gap: 8, whiteSpace: "nowrap", height: 42 }}>
-                    {loadingConvs ? <Loader2 size={14} className="spinner" /> : <Search size={14} />}
-                    {loadingConvs ? "Buscando..." : "Buscar"}
-                  </button>
-                </div>
+                <button className="btn-primary" onClick={loadConversations} disabled={loadingConvs || !selectedAgent}
+                  style={{ display: "flex", alignItems: "center", gap: 8, whiteSpace: "nowrap" }}>
+                  {loadingConvs ? <Loader2 size={14} className="spinner" /> : <Search size={14} />}
+                  {loadingConvs ? "Buscando..." : "Buscar"}
+                </button>
               </div>
             </div>
 
@@ -616,7 +510,7 @@ export default function Home() {
                   ))}
                 </div>
 
-                {/* Tab bar */}
+                {/* Sub tabs */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <div style={{ display: "flex", gap: 4, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: 4 }}>
                     {([["tabla", TableProperties, "Tabla"], ["graficos", BarChart2, "Gráficos"]] as const).map(([tab, Icon, label]) => (
@@ -646,12 +540,7 @@ export default function Home() {
                         <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 20 }}>Volumen de conversaciones</div>
                         <ResponsiveContainer width="100%" height={220}>
                           <AreaChart data={stats.groupedData}>
-                            <defs>
-                              <linearGradient id="gLL" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#6c63ff" stopOpacity={0.3} />
-                                <stop offset="95%" stopColor="#6c63ff" stopOpacity={0} />
-                              </linearGradient>
-                            </defs>
+                            <defs><linearGradient id="gLL" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#6c63ff" stopOpacity={0.3} /><stop offset="95%" stopColor="#6c63ff" stopOpacity={0} /></linearGradient></defs>
                             <CartesianGrid stroke="#1e1e2e" strokeDasharray="3 3" />
                             <XAxis dataKey="date" tick={{ fill: "#6b6b8a", fontSize: 10 }} axisLine={false} tickLine={false} />
                             <YAxis tick={{ fill: "#6b6b8a", fontSize: 10 }} axisLine={false} tickLine={false} />
@@ -662,7 +551,7 @@ export default function Home() {
                       </div>
                       <div style={card({ padding: 24 })}>
                         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Duración media por {grouping}</div>
-                        <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 20 }}>Minutos de media por conversación</div>
+                        <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 20 }}>Minutos de media</div>
                         <ResponsiveContainer width="100%" height={220}>
                           <LineChart data={stats.groupedData}>
                             <CartesianGrid stroke="#1e1e2e" strokeDasharray="3 3" />
@@ -676,7 +565,7 @@ export default function Home() {
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 16 }}>
                       <div style={card({ padding: 24 })}>
-                        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Llamadas por hora del día</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Llamadas por hora</div>
                         <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 20 }}>Distribución horaria</div>
                         <ResponsiveContainer width="100%" height={200}>
                           <BarChart data={stats.hourData}>
@@ -685,10 +574,7 @@ export default function Home() {
                             <YAxis tick={{ fill: "#6b6b8a", fontSize: 10 }} axisLine={false} tickLine={false} />
                             <Tooltip content={<ChartTooltip unit=" llamadas" />} />
                             <Bar dataKey="llamadas" radius={[4, 4, 0, 0]}>
-                              {stats.hourData.map((e, i) => {
-                                const mx = Math.max(...stats.hourData.map(d => d.llamadas));
-                                return <Cell key={i} fill={e.llamadas === mx && mx > 0 ? "#6c63ff" : "#2a2a4a"} />;
-                              })}
+                              {stats.hourData.map((e, i) => { const mx = Math.max(...stats.hourData.map(d => d.llamadas)); return <Cell key={i} fill={e.llamadas === mx && mx > 0 ? "#6c63ff" : "#2a2a4a"} />; })}
                             </Bar>
                           </BarChart>
                         </ResponsiveContainer>
@@ -718,7 +604,7 @@ export default function Home() {
                       </div>
                       <div style={card({ padding: 24 })}>
                         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Duración</div>
-                        <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 16 }}>Distribución por rangos</div>
+                        <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 16 }}>Por rangos</div>
                         <ResponsiveContainer width="100%" height={160}>
                           <BarChart data={stats.durData} layout="vertical">
                             <XAxis type="number" tick={{ fill: "#6b6b8a", fontSize: 9 }} axisLine={false} tickLine={false} />
@@ -762,11 +648,7 @@ export default function Home() {
                     <div style={{ overflowX: "auto", maxHeight: 460, overflowY: "auto" }}>
                       <table className="data-table">
                         <thead style={{ position: "sticky", top: 0, background: "var(--surface)", zIndex: 1 }}>
-                          <tr>
-                            <th style={{ width: 40 }}></th>
-                            <th>Fecha</th><th>Hora</th><th>Cola / Agente</th>
-                            <th>Duración</th><th>Mensajes</th><th>Estado</th><th>ID</th>
-                          </tr>
+                          <tr><th style={{ width: 40 }}></th><th>Fecha</th><th>Hora</th><th>Cola</th><th>Duración</th><th>Mensajes</th><th>Estado</th><th>ID</th></tr>
                         </thead>
                         <tbody>
                           {conversations.map(c => {
@@ -777,23 +659,13 @@ export default function Home() {
                                 <td><input type="checkbox" checked={selected.has(c.conversation_id)} onChange={() => toggleSelect(c.conversation_id)} onClick={e => e.stopPropagation()} style={{ accentColor: "var(--accent)", width: 14, height: 14 }} /></td>
                                 <td className="mono" style={{ fontSize: 12 }}>{dt.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" })}</td>
                                 <td className="mono" style={{ fontSize: 12 }}>{dt.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</td>
-                                <td>
-                                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                                    {q && <span style={{ fontSize: 11, color: "var(--accent)", fontWeight: 600 }}>{q.name}</span>}
-                                    <span style={{ fontSize: 11, color: "var(--muted)" }}>{agentName(c.agent_id)}</span>
-                                  </div>
-                                </td>
+                                <td><div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                                  {q ? <span style={{ fontSize: 11, color: "var(--accent)", fontWeight: 600 }}>{q.name}</span> : null}
+                                  <span style={{ fontSize: 11, color: "var(--muted)" }}>{agents.find(a => a.agent_id === c.agent_id)?.name ?? c.agent_id}</span>
+                                </div></td>
                                 <td className="mono" style={{ fontSize: 12 }}>{fmt(c.call_duration_secs)}</td>
                                 <td><div style={{ display: "flex", alignItems: "center", gap: 4 }}><MessageSquare size={12} style={{ color: "var(--muted)" }} /><span className="mono" style={{ fontSize: 12 }}>{c.message_count}</span></div></td>
-                                <td>
-                                  {(() => {
-                                    const s = c.status?.toLowerCase();
-                                    if (s === "done" || s === "completed") return <span className="tag tag-done">✓ Completada</span>;
-                                    if (s === "processing") return <span className="tag tag-processing">⟳ Procesando</span>;
-                                    if (s === "failed" || s === "error") return <span className="tag tag-failed">✗ Error</span>;
-                                    return <span className="tag tag-default">{c.status}</span>;
-                                  })()}
-                                </td>
+                                <td>{(() => { const s = c.status?.toLowerCase(); if (s === "done" || s === "completed") return <span className="tag tag-done">✓ Completada</span>; if (s === "processing") return <span className="tag tag-processing">⟳ Procesando</span>; if (s === "failed" || s === "error") return <span className="tag tag-failed">✗ Error</span>; return <span className="tag tag-default">{c.status}</span>; })()}</td>
                                 <td className="mono" style={{ fontSize: 10, color: "var(--muted)" }}>{c.conversation_id.slice(0, 20)}…</td>
                               </tr>
                             );
@@ -815,9 +687,7 @@ export default function Home() {
             {!fetched && !loadingConvs && (
               <div style={card({ padding: 48, textAlign: "center" })} className="fade-up">
                 <Search size={32} style={{ margin: "0 auto 12px", opacity: 0.3, color: "var(--muted)" }} />
-                <div style={{ fontSize: 14, color: "var(--muted)" }}>
-                  {queues.length === 0 ? "Crea una cola en «Gestión de Colas» y asigna agentes para empezar." : "Selecciona una cola o agente y pulsa Buscar."}
-                </div>
+                <div style={{ fontSize: 14, color: "var(--muted)" }}>Selecciona un agente y pulsa Buscar.</div>
               </div>
             )}
           </>
