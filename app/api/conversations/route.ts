@@ -4,16 +4,20 @@ import { fetchConversationsInRange } from "@/lib/elevenlabs";
 
 export async function POST(req: NextRequest) {
   try {
-    const { apiKey, agentId, dateFrom, dateTo } = await req.json();
-
-    if (!apiKey || !agentId) {
+    const apiKey = process.env.ELEVENLABS_API_KEY;
+    if (!apiKey) {
       return NextResponse.json(
-        { error: "Se requieren apiKey y agentId" },
-        { status: 400 }
+        { error: "Variable de entorno ELEVENLABS_API_KEY no configurada en Vercel" },
+        { status: 500 }
       );
     }
 
-    // dateFrom / dateTo are ISO date strings "YYYY-MM-DD"
+    const { agentId, dateFrom, dateTo } = await req.json();
+
+    if (!agentId) {
+      return NextResponse.json({ error: "Se requiere agentId" }, { status: 400 });
+    }
+
     const fromUnix = dateFrom
       ? Math.floor(new Date(dateFrom + "T00:00:00").getTime() / 1000)
       : undefined;
@@ -21,12 +25,7 @@ export async function POST(req: NextRequest) {
       ? Math.floor(new Date(dateTo + "T23:59:59").getTime() / 1000)
       : undefined;
 
-    const conversations = await fetchConversationsInRange(
-      apiKey,
-      agentId,
-      fromUnix,
-      toUnix
-    );
+    const conversations = await fetchConversationsInRange(apiKey, agentId, fromUnix, toUnix);
 
     return NextResponse.json({ conversations, total: conversations.length });
   } catch (err: unknown) {
