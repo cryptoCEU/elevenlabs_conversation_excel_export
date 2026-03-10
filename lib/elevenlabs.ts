@@ -91,11 +91,18 @@ export async function fetchConversationsPage(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const raw: any = await res.json();
 
-  // Note: the list endpoint returns less detail than the detail endpoint,
-  // so phones will usually be empty here and populated on detail fetch (export).
+  // The list endpoint returns less detail than the detail endpoint.
+  // metadata.phone_call is not present, but user_id holds the caller number for phone calls.
   const items: ConversationSummary[] = (raw.conversations ?? raw.items ?? []).map(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (c: any) => ({ ...c, ...extractPhones(c) })
+    (c: any) => {
+      const phones = extractPhones(c);
+      // Fallback: for phone calls, ElevenLabs puts the caller number in user_id
+      if (!phones.caller_phone && typeof c.user_id === "string" && c.user_id.startsWith("+")) {
+        phones.caller_phone = c.user_id;
+      }
+      return { ...c, ...phones };
+    }
   );
 
   return { conversations: items, has_more: raw.has_more ?? false, next_cursor: raw.next_cursor };
