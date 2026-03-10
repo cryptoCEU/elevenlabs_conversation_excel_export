@@ -10,8 +10,8 @@ export interface ConversationSummary {
   start_time_unix_secs: number;
   call_duration_secs: number;
   message_count: number;
-  caller_phone: string;  // who called in (from)
-  called_phone: string;  // number that was called (to / agent DID)
+  caller_phone: string; // who called in  → metadata.phone_call.external_number
+  called_phone: string; // number dialed  → metadata.phone_call.agent_number
   metadata?: Record<string, unknown>;
 }
 
@@ -23,12 +23,7 @@ export interface ConversationMessage {
 
 export interface ConversationDetail extends ConversationSummary {
   transcript: ConversationMessage[];
-  analysis?: {
-    evaluation_criteria_results?: Record<string, unknown>;
-    data_collection_results?: Record<string, unknown>;
-    call_successful?: string;
-    transcript_summary?: string;
-  };
+  analysis?: Record<string, unknown>;
   conversation_duration_secs?: number;
   wait_time_secs?: number;
 }
@@ -40,53 +35,27 @@ export interface ConversationsResponse {
 }
 
 // ── Phone extraction ──────────────────────────────────────────────────────────
-// Recursively searches all nested objects for phone-like strings.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function findPhone(obj: any, fields: string[]): string {
-  if (!obj || typeof obj !== "object") return "";
-  // Direct field search at this level
-  for (const f of fields) {
-    const v = obj[f];
-    if (typeof v === "string" && v.trim().length > 3 && v !== "null" && v !== "undefined") {
-      return v.trim();
-    }
-  }
-  // Recurse into nested objects (1 level deep to avoid transcript noise)
-  for (const key of Object.keys(obj)) {
-    const child = obj[key];
-    if (child && typeof child === "object" && !Array.isArray(child)) {
-      for (const f of fields) {
-        const v = child[f];
-        if (typeof v === "string" && v.trim().length > 3 && v !== "null" && v !== "undefined") {
-          return v.trim();
-        }
-      }
-    }
-  }
-  return "";
-}
-
-const CALLER_FIELDS = [
-  "caller_id", "caller_phone_number", "caller_phone",
-  "from", "from_number", "from_phone", "phone_from",
-  "caller", "call_from", "originator", "ani",
-  "source_phone", "source_number",
-];
-
-const CALLED_FIELDS = [
-  "called_id", "called_phone_number", "called_phone",
-  "to", "to_number", "to_phone", "phone_to",
-  "callee", "call_to", "destination", "dnis",
-  "destination_phone", "destination_number",
-  "agent_phone_number", "agent_phone",
-  "phone_number_id", "twilio_number", "did",
-];
-
+// Primary:  metadata.phone_call.external_number / agent_number
+// Fallback: conversation_initiation_client_data.dynamic_variables.system__caller_id / system__called_number
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractPhones(raw: any): { caller_phone: string; called_phone: string } {
+  const pc = raw?.metadata?.phone_call;
+  const dv = raw?.conversation_initiation_client_data?.dynamic_variables;
+
+  const caller_phone =
+    pc?.external_number ??
+    dv?.system__caller_id ??
+    raw?.user_id ??  // ElevenLabs also stores caller in user_id for phone calls
+    "";
+
+  const called_phone =
+    pc?.agent_number ??
+    dv?.system__called_number ??
+    "";
+
   return {
-    caller_phone: findPhone(raw, CALLER_FIELDS),
-    called_phone: findPhone(raw, CALLED_FIELDS),
+    caller_phone: typeof caller_phone === "string" ? caller_phone : "",
+    called_phone: typeof called_phone === "string" ? called_phone : "",
   };
 }
 
@@ -122,6 +91,8 @@ export async function fetchConversationsPage(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const raw: any = await res.json();
 
+  // Note: the list endpoint returns less detail than the detail endpoint,
+  // so phones will usually be empty here and populated on detail fetch (export).
   const items: ConversationSummary[] = (raw.conversations ?? raw.items ?? []).map(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (c: any) => ({ ...c, ...extractPhones(c) })
