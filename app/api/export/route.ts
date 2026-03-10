@@ -29,6 +29,16 @@ export async function POST(req: NextRequest) {
       details.push(...results);
     }
 
+    // ── FULL DEBUG LOG — visible in Vercel → Functions → Logs ──────────────
+    if (details.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw = details[0] as any;
+      console.log("=== FULL RAW CONVERSATION (first) ===");
+      console.log(JSON.stringify(raw, null, 2));
+      console.log("=== caller_phone:", raw.caller_phone);
+      console.log("=== called_phone:", raw.called_phone);
+    }
+
     const wb = buildExcelWorkbook(details, agentName ?? "Agente");
     const buffer = workbookToBuffer(wb);
 
@@ -42,6 +52,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Error desconocido";
+    console.error("[export] error:", message);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
