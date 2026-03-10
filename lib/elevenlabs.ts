@@ -10,6 +10,7 @@ export interface ConversationSummary {
   start_time_unix_secs: number;
   call_duration_secs: number;
   message_count: number;
+  caller_phone: string; // empty string if chat / no phone
   metadata?: Record<string, unknown>;
 }
 
@@ -37,8 +38,7 @@ export interface ConversationsResponse {
   next_cursor?: string;
 }
 
-// ── Safe field extraction ─────────────────────────────────────────────────────
-// Searches root + metadata for a numeric value by multiple possible field names.
+// ── Helpers ───────────────────────────────────────────────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function pickNumber(raw: any, fields: string[]): number {
   const sources = [raw, raw?.metadata ?? {}];
@@ -46,7 +46,6 @@ function pickNumber(raw: any, fields: string[]): number {
     for (const f of fields) {
       const v = src?.[f];
       if (typeof v === "number" && v > 0) {
-        // If it looks like milliseconds (> year 3000 in secs = 32503680000)
         return v > 1e12 ? Math.round(v / 1000) : Math.round(v);
       }
       if (typeof v === "string" && v.length > 0) {
@@ -58,17 +57,46 @@ function pickNumber(raw: any, fields: string[]): number {
   return 0;
 }
 
+// Searches root + metadata for a phone number string
+// ElevenLabs stores phone in different places depending on integration type
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function pickPhone(raw: any): string {
+  const PHONE_FIELDS = [
+    "caller_id", "caller_phone_number", "caller_phone",
+    "phone_number", "from_number", "from", "phone",
+    "caller", "call_from",
+  ];
+  const sources = [raw, raw?.metadata ?? {}, raw?.call_data ?? {}, raw?.phone_call ?? {}];
+  for (const src of sources) {
+    for (const f of PHONE_FIELDS) {
+      const v = src?.[f];
+      if (typeof v === "string" && v.trim().length > 0 && v !== "null") {
+        return v.trim();
+      }
+    }
+  }
+  return "";
+}
+
 // ── Fetch helpers ─────────────────────────────────────────────────────────────
 export async function fetchConversationsPage(
   apiKey: string, agentId: string, cursor?: string, pageSize = 100
-): Promise<ConversationsResponse> {
+): Promise<{ conversations: ConversationSummary[]; has_more: boolean; next_cursor?: string }> {
   const params = new URLSearchParams({ agent_id: agentId, page_size: String(pageSize) });
   if (cursor) params.set("cursor", cursor);
   const res = await fetch(`${ELEVENLABS_BASE}/convai/conversations?${params}`, {
     headers: { "xi-api-key": apiKey },
   });
   if (!res.ok) throw new Error(`ElevenLabs ${res.status}: ${await res.text()}`);
-  return res.json();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const raw: any = await res.json();
+
+  const items: ConversationSummary[] = (raw.conversations ?? raw.items ?? []).map(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (c: any) => ({ ...c, caller_phone: pickPhone(c) })
+  );
+
+  return { conversations: items, has_more: raw.has_more ?? false, next_cursor: raw.next_cursor };
 }
 
 export async function fetchConversationsInRange(
@@ -96,22 +124,19 @@ export async function fetchConversationDetail(
     headers: { "xi-api-key": apiKey },
   });
   if (!res.ok) throw new Error(`ElevenLabs ${res.status}: ${await res.text()}`);
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const raw: any = await res.json();
 
-  // Log ALL top-level keys + metadata keys so we can see what ElevenLabs sends
+  // Log structure to Vercel Function Logs for debugging
   console.log("[detail] top keys:", Object.keys(raw));
   if (raw.metadata) console.log("[detail] metadata keys:", Object.keys(raw.metadata));
-  console.log("[detail] raw timing fields:", JSON.stringify({
-    start_time_unix_secs: raw.start_time_unix_secs,
-    call_duration_secs: raw.call_duration_secs,
-    metadata_start: raw.metadata?.start_time_unix_secs,
-    metadata_duration: raw.metadata?.call_duration_secs,
-    created_at: raw.created_at,
-    duration: raw.duration,
-    metadata_created: raw.metadata?.created_at,
-    metadata_duration2: raw.metadata?.duration,
+  console.log("[detail] phone fields:", JSON.stringify({
+    caller_id: raw.caller_id,
+    caller_phone_number: raw.caller_phone_number,
+    phone_number: raw.phone_number,
+    metadata_caller: raw.metadata?.caller_id,
+    metadata_phone: raw.metadata?.phone_number,
+    metadata_from: raw.metadata?.from_number,
   }));
 
   const startTime = pickNumber(raw, [
@@ -131,6 +156,7 @@ export async function fetchConversationDetail(
     start_time_unix_secs: startTime,
     call_duration_secs: callDuration,
     message_count: raw.message_count ?? raw.transcript?.length ?? 0,
+    caller_phone: pickPhone(raw),
     transcript: Array.isArray(raw.transcript) ? raw.transcript : [],
   };
 }
