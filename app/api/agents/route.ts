@@ -1,12 +1,15 @@
 // app/api/agents/route.ts
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { fetchAgents } from "@/lib/elevenlabs";
 
-export async function POST(req: NextRequest) {
+export async function GET() {
   try {
-    const { apiKey } = await req.json();
+    const apiKey = process.env.ELEVENLABS_API_KEY;
     if (!apiKey) {
-      return NextResponse.json({ error: "Se requiere apiKey" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Variable de entorno ELEVENLABS_API_KEY no configurada en Vercel" },
+        { status: 500 }
+      );
     }
     const agents = await fetchAgents(apiKey);
     return NextResponse.json({ agents });
