@@ -1,4 +1,5 @@
 "use client";
+// v3-supabase-queues — NO loadQueues/saveQueues/createQueue
 import { useState, useCallback, useEffect, useMemo } from "react";
 import {
   Download, RefreshCw, Bot, XCircle, MessageSquare,
