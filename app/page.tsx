@@ -20,6 +20,7 @@ interface ConversationSummary {
   conversation_id: string; agent_id: string; status: string;
   start_time_unix_secs: number; call_duration_secs: number; message_count: number;
   caller_phone: string;
+  called_phone: string;
 }
 type Grouping = "dia" | "semana" | "mes";
 type RangePreset = "7d" | "30d" | "90d" | "custom";
@@ -633,7 +634,7 @@ export default function Home() {
                     <div style={{ overflowX: "auto", maxHeight: 460, overflowY: "auto" }}>
                       <table className="data-table">
                         <thead style={{ position: "sticky", top: 0, background: "var(--surface)", zIndex: 1 }}>
-                          <tr><th style={{ width: 40 }}></th><th>Fecha</th><th>Hora</th><th>Cola / Agente</th><th>Llamante</th><th>Duración</th><th>Mensajes</th><th>Estado</th><th>ID</th></tr>
+                          <tr><th style={{ width: 40 }}></th><th>Fecha</th><th>Hora</th><th>Cola / Agente</th><th>Llamante</th><th>Llamado</th><th>Duración</th><th>Mensajes</th><th>Estado</th><th>ID</th></tr>
                         </thead>
                         <tbody>
                           {conversations.map(c => {
@@ -651,6 +652,11 @@ export default function Home() {
                                 <td className="mono" style={{ fontSize: 12 }}>
                                   {c.caller_phone
                                     ? <span>{c.caller_phone}</span>
+                                    : <span style={{ color: "var(--muted)" }}>—</span>}
+                                </td>
+                                <td className="mono" style={{ fontSize: 12 }}>
+                                  {c.called_phone
+                                    ? <span>{c.called_phone}</span>
                                     : <span style={{ color: "var(--muted)" }}>—</span>}
                                 </td>
                                 <td className="mono" style={{ fontSize: 12 }}>{fmt(c.call_duration_secs)}</td>
