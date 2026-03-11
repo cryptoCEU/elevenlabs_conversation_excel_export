@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   Download, RefreshCw, Bot, XCircle, MessageSquare,
   FileSpreadsheet, Loader2, ExternalLink, Calendar,
@@ -153,34 +154,30 @@ function Pill({ label, active, onClick }: { label: string; active: boolean; onCl
 // ── Agent Dropdown ────────────────────────────────────────────────────────────
 function AgentDropdown({ agents, value, onChange }: { agents: Agent[]; value: Agent | null; onChange: (a: Agent | null) => void; }) {
   const [open, setOpen] = useState(false);
-  const [dropRect, setDropRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
-  function handleToggle() {
-    if (!open && btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect();
-      setDropRect({ top: r.bottom + 4, left: r.left, width: r.width });
-    }
-    setOpen(o => !o);
-  }
+  const rect = btnRef.current?.getBoundingClientRect();
 
   return (
     <div style={{ position: "relative" }}>
-      <button ref={btnRef} onClick={handleToggle} style={{ width: "100%", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 2, color: value ? "var(--text)" : "var(--muted)", padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>
+      <button ref={btnRef} onClick={() => setOpen(o => !o)} style={{ width: "100%", background: "var(--bg)", border: `1px solid ${open ? "var(--accent)" : "var(--border)"}`, borderRadius: 2, color: value ? "var(--text)" : "var(--muted)", padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value ? value.name : "Seleccionar agente..."}</span>
         <ChevronDown size={14} style={{ flexShrink: 0, marginLeft: 8, color: "var(--muted)", transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
       </button>
-      {open && dropRect && (
+      {open && mounted && rect && typeof document !== "undefined" && createPortal(
         <>
           <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 9998 }} />
-          <div style={{ position: "fixed", top: dropRect.top, left: dropRect.left, width: dropRect.width, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 2, zIndex: 9999, boxShadow: "0 8px 32px rgba(30,29,22,0.15)" }}>
+          <div style={{ position: "fixed", top: rect.bottom + 4, left: rect.left, width: rect.width, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 2, zIndex: 9999, boxShadow: "0 8px 32px rgba(30,29,22,0.15)" }}>
             {agents.map(a => (
               <button key={a.agent_id} onClick={() => { onChange(a); setOpen(false); }} style={{ width: "100%", padding: "10px 14px", textAlign: "left", background: value?.agent_id === a.agent_id ? "rgba(140,23,54,0.08)" : "transparent", color: value?.agent_id === a.agent_id ? "var(--accent)" : "var(--text)", border: "none", borderBottom: "1px solid rgba(200,180,154,0.25)", cursor: "pointer", fontSize: 13, fontFamily: "'Jost', sans-serif", display: "flex", alignItems: "center", gap: 8 }}>
                 <Bot size={13} style={{ color: "var(--muted)", flexShrink: 0 }} />{a.name}
               </button>
             ))}
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );
