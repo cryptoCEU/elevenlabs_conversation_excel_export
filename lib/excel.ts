@@ -32,7 +32,8 @@ function getTime(unix: number): string {
 
 export function buildExcelWorkbook(
   conversations: ConversationDetail[],
-  agentName: string
+  agentName: string,
+  agentCode = ""
 ): XLSX.WorkBook {
   const wb = XLSX.utils.book_new();
 
@@ -44,13 +45,13 @@ export function buildExcelWorkbook(
       "Fecha":                   getDate(c.start_time_unix_secs),
       "Hora":                    getTime(c.start_time_unix_secs),
       "Cola":                    agentName,
+      "Atendida":                agentCode,
       "Llamante":                c.caller_phone ?? "",
       "Llamado":                 c.called_phone ?? "",
       "Duración llamada":        fmtDuration(dur),
-
-      "T. Conversación":  conversationSecs,               // seconds (number)
-      "T. Espera":        waitSecs,                       // seconds (number)
       "T.Timbre":                c.ring_secs ?? 0,        // seconds (number)
+      "Tiempo de conversación":  conversationSecs,         // seconds (number)
+      "Tiempo de espera":        waitSecs,                 // seconds (number)
       "Finalizado":              c.ended_by ?? "—",
       "Pos.In":                  "",
       "Pos.Out":                 "",
@@ -64,6 +65,7 @@ export function buildExcelWorkbook(
     { wch: 14 }, // Fecha
     { wch: 10 }, // Hora
     { wch: 28 }, // Cola
+    { wch: 14 }, // Atendida
     { wch: 18 }, // Llamante
     { wch: 18 }, // Llamado
     { wch: 18 }, // Duración llamada
