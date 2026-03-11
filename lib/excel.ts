@@ -49,8 +49,8 @@ export function buildExcelWorkbook(
       "Llamado":                 c.called_phone ?? "",
       "Atendida":                agentCode,
       "Duración llamada":        fmtDuration(dur),
-      "Tiempo de conversación":  conversationSecs,         // seconds (number)
-      "Tiempo de espera":        waitSecs,                 // seconds (number)
+      "T. Conversación":  conversationSecs,         // seconds (number)
+      "T. Espera":        waitSecs,                 // seconds (number)
       "T.Timbre":                c.ring_secs ?? 0,        // seconds (number)
       "Finalizado":              c.ended_by ?? "—",
       "Pos.In":                  "",
