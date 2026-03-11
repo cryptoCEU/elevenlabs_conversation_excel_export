@@ -94,7 +94,7 @@ function ChartTooltip({ active, payload, label, unit = "" }: {
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div style={{ background: "#16161f", border: "1px solid #2a2a3e", borderRadius: 8, padding: "10px 14px", fontSize: 12 }}>
+    <div style={{ background: "#FFFFFF", border: "1px solid #2a2a3e", borderRadius: 8, padding: "10px 14px", fontSize: 12 }}>
       <div style={{ color: "var(--muted)", marginBottom: 6, fontFamily: "monospace" }}>{label}</div>
       {payload.map((p, i) => (
         <div key={i} style={{ color: p.color, display: "flex", gap: 6, alignItems: "center" }}>
@@ -141,12 +141,12 @@ function useStats(conversations: ConversationSummary[], grouping: Grouping) {
   }, [conversations, grouping]);
 }
 
-const COLORS = ["#6c63ff", "#22d3a3", "#ff6584", "#f59e0b", "#60a5fa"];
-const STATUS_COLORS: Record<string, string> = { done: "#22d3a3", completed: "#22d3a3", processing: "#f59e0b", failed: "#ff6584", error: "#ff6584" };
+const COLORS = ["#8C1736", "var(--muted)", "#4A7A3A", "#A0681A", "#1E1D16"];
+const STATUS_COLORS: Record<string, string> = { done: "#4A7A3A", completed: "#4A7A3A", processing: "#A0681A", failed: "#8C1736", error: "#8C1736" };
 
 function Pill({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
-    <button onClick={onClick} style={{ padding: "5px 14px", borderRadius: 20, border: "1px solid", borderColor: active ? "var(--accent)" : "var(--border)", background: active ? "rgba(108,99,255,0.15)" : "transparent", color: active ? "var(--accent)" : "var(--muted)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'Space Mono', monospace", transition: "all 0.15s", whiteSpace: "nowrap" }}>{label}</button>
+    <button onClick={onClick} style={{ padding: "5px 14px", borderRadius: 20, border: "1px solid", borderColor: active ? "var(--accent)" : "var(--border)", background: active ? "rgba(140,23,54,0.18)" : "transparent", color: active ? "var(--accent)" : "var(--muted)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Mono', monospace", transition: "all 0.15s", whiteSpace: "nowrap" }}>{label}</button>
   );
 }
 
@@ -155,14 +155,14 @@ function AgentDropdown({ agents, value, onChange }: { agents: Agent[]; value: Ag
   const [open, setOpen] = useState(false);
   return (
     <div style={{ position: "relative" }}>
-      <button onClick={() => setOpen(!open)} style={{ width: "100%", background: "#0d0d16", border: "1px solid var(--border)", borderRadius: 8, color: value ? "var(--text)" : "var(--muted)", padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", fontSize: 13, fontFamily: "'Space Mono', monospace" }}>
+      <button onClick={() => setOpen(!open)} style={{ width: "100%", background: "#FFFFFF", border: "1px solid var(--border)", borderRadius: 8, color: value ? "var(--text)" : "var(--muted)", padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", fontSize: 13, fontFamily: "'DM Mono', monospace" }}>
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value ? value.name : "Seleccionar agente..."}</span>
         <ChevronDown size={14} style={{ flexShrink: 0, marginLeft: 8, color: "var(--muted)", transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
       </button>
       {open && (
-        <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, background: "#111118", border: "1px solid var(--border)", borderRadius: 8, zIndex: 100, overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}>
+        <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, zIndex: 100, overflow: "hidden", boxShadow: "0 4px 24px rgba(30,29,22,0.1)" }}>
           {agents.map(a => (
-            <button key={a.agent_id} onClick={() => { onChange(a); setOpen(false); }} style={{ width: "100%", padding: "10px 14px", textAlign: "left", background: value?.agent_id === a.agent_id ? "rgba(108,99,255,0.12)" : "transparent", color: value?.agent_id === a.agent_id ? "var(--accent)" : "var(--text)", border: "none", cursor: "pointer", fontSize: 13, fontFamily: "'DM Sans', sans-serif", borderBottom: "1px solid rgba(30,30,46,0.6)", display: "flex", alignItems: "center", gap: 8 }}>
+            <button key={a.agent_id} onClick={() => { onChange(a); setOpen(false); }} style={{ width: "100%", padding: "10px 14px", textAlign: "left", background: value?.agent_id === a.agent_id ? "rgba(140,23,54,0.08)" : "transparent", color: value?.agent_id === a.agent_id ? "var(--accent)" : "var(--text)", border: "none", cursor: "pointer", fontSize: 13, fontFamily: "'Jost', sans-serif", borderBottom: "1px solid rgba(30,30,46,0.6)", display: "flex", alignItems: "center", gap: 8 }}>
               <Bot size={13} style={{ color: "var(--muted)", flexShrink: 0 }} />{a.name}
             </button>
           ))}
@@ -219,14 +219,14 @@ function ConversationPanel({ convId, agentName, onClose }: {
   return (
     <>
       {/* Overlay */}
-      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200, backdropFilter: "blur(2px)" }} />
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(30,29,22,0.4)", zIndex: 200, backdropFilter: "blur(2px)" }} />
       {/* Panel */}
-      <div style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: "min(680px, 95vw)", background: "#111118", borderLeft: "1px solid var(--border)", zIndex: 201, display: "flex", flexDirection: "column", animation: "slideIn 0.2s ease" }}>
+      <div style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: "min(680px, 95vw)", background: "var(--surface)", borderLeft: "1px solid var(--border)", zIndex: 201, boxShadow: "-8px 0 32px rgba(30,29,22,0.08)", display: "flex", flexDirection: "column", animation: "slideIn 0.2s ease" }}>
         <style>{`@keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>
 
         {/* Header */}
         <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", borderRadius: 6, padding: "6px 8px", cursor: "pointer", display: "flex", color: "var(--muted)" }}>
+          <button onClick={onClose} style={{ background: "rgba(30,29,22,0.06)", border: "1px solid var(--border)", borderRadius: 6, padding: "6px 8px", cursor: "pointer", display: "flex", color: "var(--muted)" }}>
             <ChevronRight size={14} />
           </button>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -257,7 +257,7 @@ function ConversationPanel({ convId, agentName, onClose }: {
             </div>
           )}
           {detail.error && (
-            <div style={{ padding: 16, background: "rgba(255,101,132,0.08)", border: "1px solid rgba(255,101,132,0.2)", borderRadius: 8, color: "var(--accent2)", fontSize: 13 }}>
+            <div style={{ padding: 16, background: "rgba(140,23,54,0.06)", border: "1px solid rgba(255,101,132,0.2)", borderRadius: 8, color: "var(--error)", fontSize: 13 }}>
               {detail.error}
             </div>
           )}
@@ -274,8 +274,8 @@ function ConversationPanel({ convId, agentName, onClose }: {
                   </div>
                   <div style={{
                     maxWidth: "82%", padding: "9px 13px", borderRadius: m.role === "agent" ? "4px 12px 12px 12px" : "12px 4px 12px 12px",
-                    background: m.role === "agent" ? "rgba(108,99,255,0.12)" : "rgba(34,211,163,0.08)",
-                    border: `1px solid ${m.role === "agent" ? "rgba(108,99,255,0.25)" : "rgba(34,211,163,0.2)"}`,
+                    background: m.role === "agent" ? "rgba(140,23,54,0.08)" : "rgba(74,122,58,0.07)",
+                    border: `1px solid ${m.role === "agent" ? "rgba(140,23,54,0.2)" : "rgba(74,122,58,0.22)"}`,
                     fontSize: 13, lineHeight: 1.5, color: "var(--text)",
                   }}>
                     {m.message}
@@ -313,8 +313,8 @@ function ConversationPanel({ convId, agentName, onClose }: {
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
                             <span style={{ fontSize: 12, fontWeight: 600 }}>{e.criteria_id}</span>
                             <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4,
-                              background: e.result === "success" ? "rgba(34,211,163,0.12)" : "rgba(255,101,132,0.1)",
-                              color: e.result === "success" ? "var(--success)" : "var(--accent2)",
+                              background: e.result === "success" ? "rgba(74,122,58,0.08)" : "rgba(255,101,132,0.1)",
+                              color: e.result === "success" ? "var(--success)" : "var(--error)",
                               fontFamily: "monospace",
                             }}>{e.result}</span>
                           </div>
@@ -372,7 +372,7 @@ function ConversationPanel({ convId, agentName, onClose }: {
             return (
               <div style={{ display: "flex", flexDirection: "column", gap: 1, borderRadius: 10, overflow: "hidden", border: "1px solid var(--border)" }}>
                 {rows.map(([label, value], i) => (
-                  <div key={i} style={{ display: "flex", gap: 0, background: i % 2 === 0 ? "var(--surface)" : "rgba(255,255,255,0.02)" }}>
+                  <div key={i} style={{ display: "flex", gap: 0, background: i % 2 === 0 ? "var(--surface)" : "rgba(234,217,208,0.4)" }}>
                     <div style={{ padding: "9px 14px", minWidth: 160, fontSize: 11, color: "var(--muted)", fontWeight: 500, borderRight: "1px solid var(--border)", flexShrink: 0 }}>{label}</div>
                     <div style={{ padding: "9px 14px", fontSize: 12, color: "var(--text)", fontFamily: "monospace", wordBreak: "break-all" }}>{value}</div>
                   </div>
@@ -384,10 +384,10 @@ function ConversationPanel({ convId, agentName, onClose }: {
           {raw && tab === "raw" && (
             <div style={{ position: "relative" }}>
               <button onClick={() => navigator.clipboard.writeText(JSON.stringify(raw, null, 2))}
-                style={{ position: "absolute", top: 8, right: 8, background: "rgba(108,99,255,0.15)", border: "1px solid rgba(108,99,255,0.3)", borderRadius: 6, padding: "4px 10px", cursor: "pointer", color: "var(--accent)", fontSize: 11, zIndex: 1 }}>
+                style={{ position: "absolute", top: 8, right: 8, background: "rgba(140,23,54,0.18)", border: "1px solid rgba(108,99,255,0.3)", borderRadius: 6, padding: "4px 10px", cursor: "pointer", color: "var(--accent)", fontSize: 11, zIndex: 1 }}>
                 Copiar
               </button>
-              <pre style={{ margin: 0, padding: 16, background: "rgba(0,0,0,0.3)", borderRadius: 10, fontSize: 11, lineHeight: 1.5, color: "#a0a0c0", whiteSpace: "pre-wrap", wordBreak: "break-all", fontFamily: "monospace", border: "1px solid var(--border)" }}>
+              <pre style={{ margin: 0, padding: 16, background: "rgba(0,0,0,0.4)", borderRadius: 10, fontSize: 11, lineHeight: 1.5, color: "var(--muted)", whiteSpace: "pre-wrap", wordBreak: "break-all", fontFamily: "monospace", border: "1px solid var(--border)" }}>
                 {JSON.stringify(raw, null, 2)}
               </pre>
             </div>
@@ -456,7 +456,7 @@ function QueueManager({ queues, agents, agentCodes, onQueuesChange, onCodeSaved 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       {error && (
-        <div style={{ padding: "12px 16px", background: "rgba(255,101,132,0.08)", border: "1px solid rgba(255,101,132,0.2)", borderRadius: 8, color: "var(--accent2)", fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ padding: "12px 16px", background: "rgba(140,23,54,0.06)", border: "1px solid rgba(255,101,132,0.2)", borderRadius: 8, color: "var(--error)", fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
           <XCircle size={14} /> {error}
         </div>
       )}
@@ -502,7 +502,7 @@ function QueueManager({ queues, agents, agentCodes, onQueuesChange, onCodeSaved 
                     <input className="input" placeholder="Ej: AGT01, EXT200..." value={localCodes[agent.agent_id] ?? ""}
                       onChange={e => setLocalCodes(p => ({ ...p, [agent.agent_id]: e.target.value }))}
                       onKeyDown={e => e.key === "Enter" && saveCode(agent.agent_id)}
-                      style={{ width: 160, fontFamily: "'Space Mono', monospace", fontSize: 12 }} />
+                      style={{ width: 160, fontFamily: "'DM Mono', monospace", fontSize: 12 }} />
                     <button onClick={() => saveCode(agent.agent_id)} disabled={savingCode === agent.agent_id}
                       style={{ background: "var(--accent)", border: "none", borderRadius: 6, padding: "7px 14px", cursor: "pointer", display: "flex", alignItems: "center", gap: 5, color: "white", fontSize: 12, whiteSpace: "nowrap" }}>
                       {savingCode === agent.agent_id ? <Loader2 size={12} className="spinner" color="white" /> : <Check size={12} />}
@@ -538,8 +538,8 @@ function QueueManager({ queues, agents, agentCodes, onQueuesChange, onCodeSaved 
                     style={{ background: "var(--success)", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer", display: "flex" }}>
                     {isSaving ? <Loader2 size={13} className="spinner" color="white" /> : <Check size={13} color="white" />}
                   </button>
-                  <button onClick={() => setEditingId(null)} style={{ background: "rgba(255,101,132,0.15)", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer", display: "flex" }}>
-                    <X size={13} color="var(--accent2)" />
+                  <button onClick={() => setEditingId(null)} style={{ background: "rgba(140,23,54,0.08)", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer", display: "flex" }}>
+                    <X size={13} color="var(--error)" />
                   </button>
                 </div>
               ) : (
@@ -559,7 +559,7 @@ function QueueManager({ queues, agents, agentCodes, onQueuesChange, onCodeSaved 
                     <Pencil size={12} />
                   </button>
                   <button onClick={() => deleteQueue(queue.id)} disabled={isSaving}
-                    style={{ background: "rgba(255,101,132,0.08)", border: "1px solid rgba(255,101,132,0.2)", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "var(--accent2)", display: "flex" }}>
+                    style={{ background: "rgba(140,23,54,0.06)", border: "1px solid rgba(255,101,132,0.2)", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "var(--error)", display: "flex" }}>
                     <Trash2 size={12} />
                   </button>
                 </div>
@@ -585,7 +585,7 @@ function QueueManager({ queues, agents, agentCodes, onQueuesChange, onCodeSaved 
                           title={otherQ ? `Ya en: ${otherQ.name}` : ""}
                           style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "1px solid", transition: "all 0.15s", cursor: "pointer", fontSize: 12,
                             borderColor: assigned ? "var(--success)" : otherQ ? "var(--warning)" : "var(--border)",
-                            background: assigned ? "rgba(34,211,163,0.1)" : otherQ ? "rgba(245,158,11,0.08)" : "rgba(255,255,255,0.02)",
+                            background: assigned ? "rgba(74,122,58,0.08)" : otherQ ? "rgba(160,104,26,0.08)" : "rgba(234,217,208,0.4)",
                             color: assigned ? "var(--success)" : otherQ ? "var(--warning)" : "var(--text)" }}>
                           {assigned ? <Check size={12} /> : <Bot size={12} style={{ color: "var(--muted)" }} />}
                           {agent.name}
@@ -699,13 +699,13 @@ export default function Home() {
     <div className="gradient-bg min-h-screen">
       <header style={{ borderBottom: "1px solid var(--border)" }}>
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div style={{ width: 36, height: 36, background: "var(--accent)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <FileSpreadsheet size={18} color="white" />
+          <div className="flex items-center gap-4">
+            <div style={{ width: 38, height: 38, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <FileSpreadsheet size={17} color="var(--text)" />
             </div>
             <div>
-              <div className="mono" style={{ fontSize: 14, fontWeight: 700 }}>ElevenLabs Exporter</div>
-              <div style={{ fontSize: 11, color: "var(--muted)" }}>Conversaciones → Excel</div>
+              <div className="serif" style={{ fontSize: 17, fontWeight: 600, letterSpacing: "0.02em", color: "var(--text)" }}>Activum</div>
+              <div style={{ fontSize: 10, color: "var(--muted)", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'DM Mono', monospace" }}>Conversaciones · ElevenLabs</div>
             </div>
           </div>
           <div style={{ display: "flex", gap: 10 }}>
@@ -719,7 +719,7 @@ export default function Home() {
         </div>
         <div className="max-w-7xl mx-auto px-6" style={{ display: "flex", borderTop: "1px solid var(--border)" }}>
           {([["datos", TableProperties, "Datos"], ["colas", Layers, "Gestión de Colas"]] as const).map(([tab, Icon, label]) => (
-            <button key={tab} onClick={() => setMainTab(tab)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "12px 20px", border: "none", borderBottom: mainTab === tab ? "2px solid var(--accent)" : "2px solid transparent", background: "transparent", color: mainTab === tab ? "var(--accent)" : "var(--muted)", fontSize: 13, fontWeight: 500, cursor: "pointer", transition: "all 0.15s", marginBottom: -1 }}>
+            <button key={tab} onClick={() => setMainTab(tab)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "12px 20px", border: "none", borderBottom: mainTab === tab ? "2px solid var(--accent)" : "2px solid transparent", background: "transparent", color: mainTab === tab ? "var(--accent)" : "var(--muted)", fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase" as const, cursor: "pointer", transition: "all 0.15s", marginBottom: -1, fontFamily: "'DM Mono', monospace" }}>
               <Icon size={14} />{label}
               {tab === "colas" && loadingQueues && <Loader2 size={11} className="spinner" style={{ marginLeft: 4 }} />}
             </button>
@@ -729,7 +729,7 @@ export default function Home() {
 
       <main className="max-w-7xl mx-auto px-6 py-8" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {error && (
-          <div className="fade-up" style={{ padding: "12px 16px", background: "rgba(255,101,132,0.08)", border: "1px solid rgba(255,101,132,0.2)", borderRadius: 8, color: "var(--accent2)", fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
+          <div className="fade-up" style={{ padding: "12px 16px", background: "rgba(140,23,54,0.06)", border: "1px solid rgba(255,101,132,0.2)", borderRadius: 8, color: "var(--error)", fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
             <XCircle size={14} /> {error}
           </div>
         )}
@@ -748,7 +748,7 @@ export default function Home() {
                 <div>
                   <label style={{ fontSize: 11, color: "var(--muted)", display: "block", marginBottom: 6 }}>AGENTE</label>
                   {loadingAgents
-                    ? <div style={{ padding: "10px 14px", background: "#0d0d16", border: "1px solid var(--border)", borderRadius: 8, color: "var(--muted)", fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}><Loader2 size={13} className="spinner" />Cargando agentes...</div>
+                    ? <div style={{ padding: "10px 14px", background: "#FFFFFF", border: "1px solid var(--border)", borderRadius: 8, color: "var(--muted)", fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}><Loader2 size={13} className="spinner" />Cargando agentes...</div>
                     : <AgentDropdown agents={agents} value={selectedAgent} onChange={a => { setSelectedAgent(a); setFetched(false); setConversations([]); }} />
                   }
                   {selectedAgent && (
@@ -802,7 +802,7 @@ export default function Home() {
                   ].map(({ label, value, color }) => (
                     <div key={label} style={card({ padding: "16px 18px" })}>
                       <div style={{ fontSize: 10, color: "var(--muted)", letterSpacing: "0.08em", marginBottom: 8, fontFamily: "monospace" }}>{label}</div>
-                      <div style={{ fontSize: 20, fontWeight: 700, color, fontFamily: "'Space Mono', monospace" }}>{value}</div>
+                      <div style={{ fontSize: 22, fontWeight: 600, color, fontFamily: "'Playfair Display', serif" }}>{value}</div>
                     </div>
                   ))}
                 </div>
@@ -835,12 +835,12 @@ export default function Home() {
                         <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 20 }}>Volumen de conversaciones</div>
                         <ResponsiveContainer width="100%" height={220}>
                           <AreaChart data={stats.groupedData}>
-                            <defs><linearGradient id="gLL" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#6c63ff" stopOpacity={0.3}/><stop offset="95%" stopColor="#6c63ff" stopOpacity={0}/></linearGradient></defs>
+                            <defs><linearGradient id="gLL" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#8C1736" stopOpacity={0.15}/><stop offset="95%" stopColor="#8C1736" stopOpacity={0}/></linearGradient></defs>
                             <CartesianGrid stroke="#1e1e2e" strokeDasharray="3 3"/>
                             <XAxis dataKey="date" tick={{ fill:"#6b6b8a", fontSize:10 }} axisLine={false} tickLine={false}/>
                             <YAxis tick={{ fill:"#6b6b8a", fontSize:10 }} axisLine={false} tickLine={false}/>
                             <Tooltip content={<ChartTooltip unit=" llamadas"/>}/>
-                            <Area type="monotone" dataKey="llamadas" stroke="#6c63ff" strokeWidth={2} fill="url(#gLL)"/>
+                            <Area type="monotone" dataKey="llamadas" stroke="#8C1736" strokeWidth={2} fill="url(#gLL)"/>
                           </AreaChart>
                         </ResponsiveContainer>
                       </div>
@@ -868,7 +868,7 @@ export default function Home() {
                             <XAxis dataKey="hora" tick={{ fill:"#6b6b8a", fontSize:9 }} axisLine={false} tickLine={false} interval={2}/>
                             <YAxis tick={{ fill:"#6b6b8a", fontSize:10 }} axisLine={false} tickLine={false}/>
                             <Tooltip content={<ChartTooltip unit=" llamadas"/>}/>
-                            <Bar dataKey="llamadas" radius={[4,4,0,0]}>{stats.hourData.map((e,i)=>{ const mx=Math.max(...stats.hourData.map(d=>d.llamadas)); return <Cell key={i} fill={e.llamadas===mx&&mx>0?"#6c63ff":"#2a2a4a"}/>; })}</Bar>
+                            <Bar dataKey="llamadas" radius={[4,4,0,0]}>{stats.hourData.map((e,i)=>{ const mx=Math.max(...stats.hourData.map(d=>d.llamadas)); return <Cell key={i} fill={e.llamadas===mx&&mx>0?"#8C1736":"#EAD9D0"}/>; })}</Bar>
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
@@ -994,7 +994,7 @@ export default function Home() {
         />
       )}
       <footer style={{ borderTop: "1px solid var(--border)", padding: "16px 24px", textAlign: "center", fontSize: 11, color: "var(--muted)", marginTop: 32 }}>
-        <span className="mono">ElevenLabs Exporter</span> · Colas guardadas en Supabase
+        <span className="serif" style={{ fontSize: 13 }}>Activum</span> <span style={{ color: "var(--border)" }}>·</span> Colas guardadas en Supabase
       </footer>
     </div>
   );
