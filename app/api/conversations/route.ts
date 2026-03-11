@@ -27,6 +27,18 @@ export async function POST(req: NextRequest) {
 
     const conversations = await fetchConversationsInRange(apiKey, agentId, fromUnix, toUnix);
 
+    // Debug: log first item from list to see available fields for phone detection
+    if (conversations.length > 0) {
+      const s = conversations[0] as unknown as Record<string, unknown>;
+      console.log("[conversations list] first item keys:", Object.keys(s));
+      console.log("[conversations list] phone fields:", JSON.stringify({
+        user_id: s.user_id,
+        caller_phone: s.caller_phone,
+        called_phone: s.called_phone,
+        metadata_keys: s.metadata ? Object.keys(s.metadata as object) : [],
+      }));
+    }
+
     return NextResponse.json({ conversations, total: conversations.length });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Error desconocido";
