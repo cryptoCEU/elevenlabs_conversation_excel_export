@@ -4,7 +4,7 @@ import {
   Download, RefreshCw, Bot, XCircle, MessageSquare,
   FileSpreadsheet, Loader2, ExternalLink, Calendar,
   ChevronDown, Search, BarChart2, TableProperties,
-  Layers, Plus, Trash2, Check, X, Pencil, AlertCircle,
+  Layers, Plus, Trash2, Check, X, Pencil, AlertCircle, Hash,
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, LineChart, Line,
@@ -75,6 +75,15 @@ async function apiUpdateQueue(id: string, updates: Partial<Queue>): Promise<Queu
 }
 async function apiDeleteQueue(id: string): Promise<void> {
   const r = await fetch(`/api/queues/${id}`, { method: "DELETE" });
+  if (!r.ok) { const d = await r.json(); throw new Error(d.error); }
+}
+async function apiGetAgentCodes(): Promise<Record<string, string>> {
+  const r = await fetch("/api/agent-codes"); const d = await r.json();
+  if (!r.ok) throw new Error(d.error);
+  return d;
+}
+async function apiSetAgentCode(agent_id: string, code: string): Promise<void> {
+  const r = await fetch("/api/agent-codes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ agent_id, code }) });
   if (!r.ok) { const d = await r.json(); throw new Error(d.error); }
 }
 
@@ -163,14 +172,25 @@ function AgentDropdown({ agents, value, onChange }: { agents: Agent[]; value: Ag
 }
 
 // ── Queue Manager ─────────────────────────────────────────────────────────────
-function QueueManager({ queues, agents, onQueuesChange }: {
-  queues: Queue[]; agents: Agent[]; onQueuesChange: () => void;
+function QueueManager({ queues, agents, agentCodes, onQueuesChange, onCodeSaved }: {
+  queues: Queue[]; agents: Agent[]; agentCodes: Record<string, string>;
+  onQueuesChange: () => void; onCodeSaved: (agentId: string, code: string) => void;
 }) {
   const [newName, setNewName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [saving, setSaving] = useState<string | null>(null); // id of queue being saved
+  const [savingCode, setSavingCode] = useState<string | null>(null);
+  const [localCodes, setLocalCodes] = useState<Record<string, string>>(agentCodes);
   const [error, setError] = useState("");
+
+  async function saveCode(agentId: string) {
+    const code = (localCodes[agentId] ?? "").trim();
+    setSavingCode(agentId);
+    try { await apiSetAgentCode(agentId, code); onCodeSaved(agentId, code); }
+    catch (e: unknown) { setError(e instanceof Error ? e.message : "Error guardando código"); }
+    finally { setSavingCode(null); }
+  }
 
   async function addQueue() {
     if (!newName.trim()) return;
@@ -227,6 +247,44 @@ function QueueManager({ queues, agents, onQueuesChange }: {
             style={{ display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
             {saving === "new" ? <Loader2 size={14} className="spinner" /> : <Plus size={14} />} Crear cola
           </button>
+        </div>
+      </div>
+
+      {/* Códigos de Atendida */}
+      <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10 }}>
+          <Hash size={15} style={{ color: "var(--accent)" }} />
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>Códigos de Atendida</div>
+            <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>
+              Código que aparecerá en la columna <strong style={{ color: "var(--text)" }}>Atendida</strong> del Excel para cada agente.
+            </div>
+          </div>
+        </div>
+        <div style={{ padding: 20 }}>
+          {agents.length === 0
+            ? <div style={{ fontSize: 12, color: "var(--muted)" }}>No hay agentes cargados.</div>
+            : <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {agents.map(agent => (
+                  <div key={agent.agent_id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <Bot size={11} style={{ verticalAlign: "middle", marginRight: 4 }} />{agent.name}
+                      </div>
+                    </div>
+                    <input className="input" placeholder="Ej: AGT01, EXT200..." value={localCodes[agent.agent_id] ?? ""}
+                      onChange={e => setLocalCodes(p => ({ ...p, [agent.agent_id]: e.target.value }))}
+                      onKeyDown={e => e.key === "Enter" && saveCode(agent.agent_id)}
+                      style={{ width: 160, fontFamily: "'Space Mono', monospace", fontSize: 12 }} />
+                    <button onClick={() => saveCode(agent.agent_id)} disabled={savingCode === agent.agent_id}
+                      style={{ background: "var(--accent)", border: "none", borderRadius: 6, padding: "7px 14px", cursor: "pointer", display: "flex", alignItems: "center", gap: 5, color: "white", fontSize: 12, whiteSpace: "nowrap" }}>
+                      {savingCode === agent.agent_id ? <Loader2 size={12} className="spinner" color="white" /> : <Check size={12} />}
+                      Guardar
+                    </button>
+                  </div>
+                ))}
+              </div>
+          }
         </div>
       </div>
 
@@ -322,6 +380,8 @@ function QueueManager({ queues, agents, onQueuesChange }: {
 export default function Home() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [queues, setQueues] = useState<Queue[]>([]);
+  const [agentCodes, setAgentCodes] = useState<Record<string, string>>({});
+  const [savingCode, setSavingCode] = useState<string | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [mainTab, setMainTab] = useState<MainTab>("datos");
   const [dataTab, setDataTab] = useState<"tabla" | "graficos">("tabla");
@@ -341,7 +401,11 @@ export default function Home() {
 
   const fetchQueues = useCallback(async () => {
     setLoadingQueues(true);
-    try { setQueues(await apiGetQueues()); }
+    try {
+      const [qs, codes] = await Promise.all([apiGetQueues(), apiGetAgentCodes()]);
+      setQueues(qs);
+      setAgentCodes(codes);
+    }
     catch (e: unknown) { setError(e instanceof Error ? e.message : "Error cargando colas"); }
     finally { setLoadingQueues(false); }
   }, []);
@@ -386,7 +450,7 @@ export default function Home() {
     const queueName = selectedAgent ? (getQueueForAgent(queues, selectedAgent.agent_id)?.name ?? selectedAgent.name) : "Agente";
     setExporting(true); setError("");
     try {
-      const r = await fetch("/api/export", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ agentName: queueName, conversationIds: Array.from(selected) }) });
+      const r = await fetch("/api/export", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ agentName: queueName, agentCode: selectedAgent ? (agentCodes[selectedAgent.agent_id] ?? "") : "", conversationIds: Array.from(selected) }) });
       if (!r.ok) { const d = await r.json(); throw new Error(d.error); }
       const blob = await r.blob();
       const url = URL.createObjectURL(blob);
@@ -444,7 +508,7 @@ export default function Home() {
 
         {/* ══ COLAS ══ */}
         {mainTab === "colas" && (
-          <QueueManager queues={queues} agents={agents} onQueuesChange={fetchQueues} />
+          <QueueManager queues={queues} agents={agents} agentCodes={agentCodes} onQueuesChange={fetchQueues} onCodeSaved={(id, code) => setAgentCodes(p => ({ ...p, [id]: code }))} />
         )}
 
         {/* ══ DATOS ══ */}
