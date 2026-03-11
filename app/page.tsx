@@ -760,12 +760,6 @@ export default function Home() {
                     ? <div style={{ padding: "10px 14px", background: "#FFFFFF", border: "1px solid var(--border)", borderRadius: 8, color: "var(--muted)", fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}><Loader2 size={13} className="spinner" />Cargando agentes...</div>
                     : <AgentDropdown agents={agents} value={selectedAgent} onChange={a => { setSelectedAgent(a); setFetched(false); setConversations([]); }} />
                   }
-                  <div style={{ marginTop: 8, fontSize: 11, display: "flex", alignItems: "center", gap: 6, height: 20 }}>
-                    {selectedAgent && (selectedQueue
-                      ? <><Layers size={11} style={{ color: "var(--accent)" }} /><span style={{ color: "var(--muted)" }}>Cola:</span><span style={{ color: "var(--accent)", fontWeight: 600 }}>{selectedQueue.name}</span><span style={{ color: "var(--muted)" }}>→ aparecerá en el Excel</span></>
-                      : <><AlertCircle size={11} style={{ color: "var(--warning)" }} /><span style={{ color: "var(--warning)" }}>Sin cola asignada — se usará el nombre del agente.</span><button onClick={() => setMainTab("colas")} style={{ background: "none", border: "none", color: "var(--warning)", cursor: "pointer", textDecoration: "underline", fontSize: 11, padding: 0 }}>Asignar cola →</button></>
-                    )}
-                  </div>
                 </div>
 
                 {/* Range */}
@@ -794,6 +788,13 @@ export default function Home() {
                   {loadingConvs ? <Loader2 size={14} className="spinner" /> : <Search size={14} />}
                   {loadingConvs ? "Buscando..." : "Buscar"}
                 </button>
+              </div>
+              {/* Queue info — always rendered to avoid layout shift */}
+              <div style={{ marginTop: 8, fontSize: 11, display: "flex", alignItems: "center", gap: 6, height: 18 }}>
+                {selectedAgent && (selectedQueue
+                  ? <><Layers size={11} style={{ color: "var(--accent)" }} /><span style={{ color: "var(--muted)" }}>Cola:</span><span style={{ color: "var(--accent)", fontWeight: 600 }}>{selectedQueue.name}</span><span style={{ color: "var(--muted)" }}>→ aparecerá en el Excel</span></>
+                  : <><AlertCircle size={11} style={{ color: "var(--warning)" }} /><span style={{ color: "var(--warning)" }}>Sin cola asignada — se usará el nombre del agente.</span><button onClick={() => setMainTab("colas")} style={{ background: "none", border: "none", color: "var(--warning)", cursor: "pointer", textDecoration: "underline", fontSize: 11, padding: 0 }}>Asignar cola →</button></>
+                )}
               </div>
             </div>
 
