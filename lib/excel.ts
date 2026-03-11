@@ -44,11 +44,13 @@ export function buildExcelWorkbook(
       "Fecha":                   getDate(c.start_time_unix_secs),
       "Hora":                    getTime(c.start_time_unix_secs),
       "Cola":                    agentName,
-      "Llamante":                c.caller_phone ?? "",   // who called in (from)
-      "Llamado":                 c.called_phone ?? "",   // number that was dialed (to)
+      "Llamante":                c.caller_phone ?? "",
+      "Llamado":                 c.called_phone ?? "",
       "Duración llamada":        fmtDuration(dur),
-      "Tiempo de conversación":  conversationSecs,
-      "Tiempo de espera":        waitSecs,
+      "T.Timbre":                c.ring_secs ?? 0,        // seconds (number)
+      "Tiempo de conversación":  conversationSecs,         // seconds (number)
+      "Tiempo de espera":        waitSecs,                 // seconds (number)
+      "Finalizado":              c.ended_by ?? "—",
       "ID Conversación":         c.conversation_id,
     };
   });
@@ -62,8 +64,10 @@ export function buildExcelWorkbook(
     { wch: 18 }, // Llamante
     { wch: 18 }, // Llamado
     { wch: 18 }, // Duración llamada
+    { wch: 12 }, // T.Timbre
     { wch: 22 }, // Tiempo de conversación
     { wch: 18 }, // Tiempo de espera
+    { wch: 14 }, // Finalizado
     { wch: 38 }, // ID Conversación
   ];
 
