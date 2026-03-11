@@ -700,9 +700,9 @@ export default function Home() {
       <header style={{ borderBottom: "1px solid var(--border)" }}>
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <img src="/logo.svg" alt="Activum" style={{ height: 38, width: "auto" }} />
+            <img src="/logo.svg" alt="Activum" style={{ height: 56, width: "auto" }} />
             <div>
-              <div className="serif" style={{ fontSize: 17, fontWeight: 600, letterSpacing: "0.02em", color: "var(--text)" }}>Activum</div>
+              <div className="serif" style={{ fontSize: 17, fontWeight: 600, letterSpacing: "0.02em", color: "var(--text)" }}>Agente IA Dashboard</div>
               <div style={{ fontSize: 10, color: "var(--muted)", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'DM Mono', monospace" }}>Conversaciones · ElevenLabs</div>
             </div>
           </div>
