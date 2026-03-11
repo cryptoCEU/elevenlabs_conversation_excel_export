@@ -45,9 +45,9 @@ export function buildExcelWorkbook(
       "Fecha":                   getDate(c.start_time_unix_secs),
       "Hora":                    getTime(c.start_time_unix_secs),
       "Cola":                    agentName,
-      "Atendida":                agentCode,
       "Llamante":                c.caller_phone ?? "",
       "Llamado":                 c.called_phone ?? "",
+      "Atendida":                agentCode,
       "Duración llamada":        fmtDuration(dur),
       "T.Timbre":                c.ring_secs ?? 0,        // seconds (number)
       "Tiempo de conversación":  conversationSecs,         // seconds (number)
