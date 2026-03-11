@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback, useEffect, useMemo } from "react";
+import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import {
   Download, RefreshCw, Bot, XCircle, MessageSquare,
   FileSpreadsheet, Loader2, ExternalLink, Calendar,
@@ -700,9 +700,7 @@ export default function Home() {
       <header style={{ borderBottom: "1px solid var(--border)" }}>
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div style={{ width: 38, height: 38, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <FileSpreadsheet size={17} color="var(--text)" />
-            </div>
+            <img src="/logo.svg" alt="Activum" style={{ height: 38, width: "auto" }} />
             <div>
               <div className="serif" style={{ fontSize: 17, fontWeight: 600, letterSpacing: "0.02em", color: "var(--text)" }}>Activum</div>
               <div style={{ fontSize: 10, color: "var(--muted)", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'DM Mono', monospace" }}>Conversaciones · ElevenLabs</div>
@@ -998,4 +996,4 @@ export default function Home() {
       </footer>
     </div>
   );
-}
+}// ── Agent Dropdown ────────────────────────────────────────────────────────────
