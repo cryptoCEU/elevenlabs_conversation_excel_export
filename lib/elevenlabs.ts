@@ -85,14 +85,14 @@ function extractEndedBy(raw: any): string {
   ).toLowerCase();
 
   if (!reason) return "—";
-  if (reason.includes("end_call") || reason.includes("agent")) return "Agente";
-  if (reason.includes("user_hangup") || reason.includes("caller") || reason.includes("user hang")) return "Caller";
+  if (reason.includes("end_call") || reason.includes("agent")) return "agent";
+  if (reason.includes("user_hangup") || reason.includes("caller") || reason.includes("user hang")) return "caller";
   if (
     reason.includes("abandon") ||
     reason.includes("timeout") ||
     reason.includes("silence") ||
     reason.includes("inactivity")
-  ) return "Abandon";
+  ) return "abandon";
   // fallback: return raw value trimmed
   return raw?.metadata?.termination_reason ?? "—";
 }
