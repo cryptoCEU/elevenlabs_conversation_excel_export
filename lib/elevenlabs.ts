@@ -85,15 +85,31 @@ function extractEndedBy(raw: any): string {
   ).toLowerCase();
 
   if (!reason) return "—";
-  if (reason.includes("end_call") || reason.includes("agent")) return "agent";
-  if (reason.includes("user_hangup") || reason.includes("caller") || reason.includes("user hang")) return "caller";
+
+  // Agent ended: tool call to end_call
+  if (reason.includes("end_call")) return "agent";
+
+  // Caller hung up: WebSocket/SIP disconnect codes
+  // "Client disconnected: 1000" = normal WS close by client
+  // "user_hangup", "caller_hangup", "user hang"
+  if (
+    reason.includes("client disconnected") ||
+    reason.includes("user_hangup") ||
+    reason.includes("caller_hangup") ||
+    reason.includes("user hang") ||
+    reason.includes("caller hang")
+  ) return "caller";
+
+  // Abandoned: timeouts, silence, inactivity
   if (
     reason.includes("abandon") ||
     reason.includes("timeout") ||
     reason.includes("silence") ||
-    reason.includes("inactivity")
+    reason.includes("inactivity") ||
+    reason.includes("no response")
   ) return "abandon";
-  // fallback: return raw value trimmed
+
+  // fallback: return raw value trimmed so we can see new values in prod
   return raw?.metadata?.termination_reason ?? "—";
 }
 
