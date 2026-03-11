@@ -55,7 +55,7 @@ export default function LoginPage() {
       }}>
         {/* Logo + title */}
         <div style={{ textAlign: "center", marginBottom: 40 }}>
-          <img src="/logo.svg" alt="Activum" style={{ height: 64, width: "auto", marginBottom: 20 }} />
+          <img src="/logo.svg" alt="Activum" style={{ height: 100, width: "auto", marginBottom: 24, display: "block", margin: "0 auto 24px" }} />
           <div style={{ fontSize: 22, fontWeight: 600, color: "var(--text)", fontFamily: "'Playfair Display', serif", letterSpacing: "0.01em" }}>
             Agente IA Dashboard
           </div>
