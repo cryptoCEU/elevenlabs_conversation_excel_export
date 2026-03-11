@@ -21,6 +21,8 @@ interface ConversationSummary {
   start_time_unix_secs: number; call_duration_secs: number; message_count: number;
   caller_phone: string;
   called_phone: string;
+  ring_secs: number;
+  ended_by: string;
 }
 type Grouping = "dia" | "semana" | "mes";
 type RangePreset = "7d" | "30d" | "90d" | "custom";
@@ -634,7 +636,7 @@ export default function Home() {
                     <div style={{ overflowX: "auto", maxHeight: 460, overflowY: "auto" }}>
                       <table className="data-table">
                         <thead style={{ position: "sticky", top: 0, background: "var(--surface)", zIndex: 1 }}>
-                          <tr><th style={{ width: 40 }}></th><th>Fecha</th><th>Hora</th><th>Cola / Agente</th><th>Llamante</th><th>Llamado</th><th>Duración</th><th>Mensajes</th><th>Estado</th><th>ID</th></tr>
+                          <tr><th style={{ width: 40 }}></th><th>Fecha</th><th>Hora</th><th>Cola / Agente</th><th>Llamante</th><th>Llamado</th><th>Duración</th><th>T.Timbre</th><th>Mensajes</th><th>Estado</th><th>Finalizado</th><th>ID</th></tr>
                         </thead>
                         <tbody>
                           {conversations.map(c => {
@@ -660,8 +662,12 @@ export default function Home() {
                                     : <span style={{ color: "var(--muted)" }}>—</span>}
                                 </td>
                                 <td className="mono" style={{ fontSize: 12 }}>{fmt(c.call_duration_secs)}</td>
+                                <td className="mono" style={{ fontSize: 12 }}>
+                                  {c.ring_secs > 0 ? `${c.ring_secs}s` : <span style={{ color: "var(--muted)" }}>—</span>}
+                                </td>
                                 <td><div style={{ display: "flex", alignItems: "center", gap: 4 }}><MessageSquare size={12} style={{ color: "var(--muted)" }} /><span className="mono" style={{ fontSize: 12 }}>{c.message_count}</span></div></td>
                                 <td>{(() => { const s = c.status?.toLowerCase(); if (s==="done"||s==="completed") return <span className="tag tag-done">✓ Completada</span>; if (s==="processing") return <span className="tag tag-processing">⟳ Procesando</span>; if (s==="failed"||s==="error") return <span className="tag tag-failed">✗ Error</span>; return <span className="tag tag-default">{c.status}</span>; })()}</td>
+                                <td>{(() => { const e = c.ended_by; if (!e || e === "—") return <span style={{ color: "var(--muted)" }}>—</span>; if (e === "Agente") return <span className="tag tag-done">Agente</span>; if (e === "Caller") return <span className="tag tag-processing">Caller</span>; if (e === "Abandon") return <span className="tag tag-failed">Abandon</span>; return <span className="tag tag-default">{e}</span>; })()}</td>
                                 <td className="mono" style={{ fontSize: 10, color: "var(--muted)" }}>{c.conversation_id.slice(0,20)}…</td>
                               </tr>
                             );
