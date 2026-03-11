@@ -5,6 +5,7 @@ import {
   FileSpreadsheet, Loader2, ExternalLink, Calendar,
   ChevronDown, Search, BarChart2, TableProperties,
   Layers, Plus, Trash2, Check, X, Pencil, AlertCircle, Hash,
+  ChevronRight, FileJson, FileText, FlaskConical, Info,
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, LineChart, Line,
@@ -168,6 +169,232 @@ function AgentDropdown({ agents, value, onChange }: { agents: Agent[]; value: Ag
         </div>
       )}
     </div>
+  );
+}
+
+
+// ── Conversation Detail Panel ─────────────────────────────────────────────────
+type DetailTab = "transcript" | "analysis" | "metadata" | "raw";
+
+interface ConvDetail {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  raw: any;
+  loading: boolean;
+  error: string;
+}
+
+function fmtSecs(secs: number) {
+  if (!secs || secs <= 0) return "0m 00s";
+  const m = Math.floor(secs / 60), s = Math.floor(secs % 60);
+  return `${m}m ${String(s).padStart(2, "0")}s`;
+}
+
+function ConversationPanel({ convId, agentName, onClose }: {
+  convId: string; agentName: string; onClose: () => void;
+}) {
+  const [tab, setTab] = useState<DetailTab>("transcript");
+  const [detail, setDetail] = useState<ConvDetail>({ raw: null, loading: true, error: "" });
+
+  useEffect(() => {
+    if (!convId) return;
+    setDetail({ raw: null, loading: true, error: "" });
+    fetch(`/api/conversation-detail/${convId}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) setDetail({ raw: null, loading: false, error: d.error });
+        else setDetail({ raw: d, loading: false, error: "" });
+      })
+      .catch(e => setDetail({ raw: null, loading: false, error: e.message }));
+  }, [convId]);
+
+  const raw = detail.raw;
+
+  const tabs: { id: DetailTab; label: string; icon: React.ReactNode }[] = [
+    { id: "transcript", label: "Transcripción", icon: <FileText size={13} /> },
+    { id: "analysis",   label: "Análisis",      icon: <FlaskConical size={13} /> },
+    { id: "metadata",   label: "Metadatos",     icon: <Info size={13} /> },
+    { id: "raw",        label: "JSON Raw",       icon: <FileJson size={13} /> },
+  ];
+
+  return (
+    <>
+      {/* Overlay */}
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200, backdropFilter: "blur(2px)" }} />
+      {/* Panel */}
+      <div style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: "min(680px, 95vw)", background: "#111118", borderLeft: "1px solid var(--border)", zIndex: 201, display: "flex", flexDirection: "column", animation: "slideIn 0.2s ease" }}>
+        <style>{`@keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>
+
+        {/* Header */}
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", borderRadius: 6, padding: "6px 8px", cursor: "pointer", display: "flex", color: "var(--muted)" }}>
+            <ChevronRight size={14} />
+          </button>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 600, fontSize: 13 }}>{agentName}</div>
+            <div style={{ fontSize: 10, color: "var(--muted)", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{convId}</div>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display: "flex", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
+          {tabs.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)} style={{
+              flex: 1, padding: "10px 4px", background: "transparent", border: "none",
+              borderBottom: tab === t.id ? "2px solid var(--accent)" : "2px solid transparent",
+              color: tab === t.id ? "var(--accent)" : "var(--muted)",
+              cursor: "pointer", fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, transition: "color 0.15s",
+            }}>
+              {t.icon}{t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div style={{ flex: 1, overflow: "auto", padding: 20 }}>
+          {detail.loading && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 200, gap: 10, color: "var(--muted)" }}>
+              <Loader2 size={20} className="spinner" /> Cargando...
+            </div>
+          )}
+          {detail.error && (
+            <div style={{ padding: 16, background: "rgba(255,101,132,0.08)", border: "1px solid rgba(255,101,132,0.2)", borderRadius: 8, color: "var(--accent2)", fontSize: 13 }}>
+              {detail.error}
+            </div>
+          )}
+
+          {raw && tab === "transcript" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {(raw.transcript ?? []).filter((m: {role:string;message:string|null}) => m.message).map((m: {role:string;message:string;time_in_call_secs:number}, i: number) => (
+                <div key={i} style={{
+                  display: "flex", flexDirection: "column", gap: 3,
+                  alignItems: m.role === "agent" ? "flex-start" : "flex-end",
+                }}>
+                  <div style={{ fontSize: 9, color: "var(--muted)", fontFamily: "monospace", paddingInline: 2 }}>
+                    {m.role === "agent" ? "🤖 Agente" : "👤 Usuario"} · {fmtSecs(m.time_in_call_secs)}
+                  </div>
+                  <div style={{
+                    maxWidth: "82%", padding: "9px 13px", borderRadius: m.role === "agent" ? "4px 12px 12px 12px" : "12px 4px 12px 12px",
+                    background: m.role === "agent" ? "rgba(108,99,255,0.12)" : "rgba(34,211,163,0.08)",
+                    border: `1px solid ${m.role === "agent" ? "rgba(108,99,255,0.25)" : "rgba(34,211,163,0.2)"}`,
+                    fontSize: 13, lineHeight: 1.5, color: "var(--text)",
+                  }}>
+                    {m.message}
+                  </div>
+                </div>
+              ))}
+              {!(raw.transcript ?? []).filter((m: {message:string|null}) => m.message).length && (
+                <div style={{ color: "var(--muted)", fontSize: 13, textAlign: "center", padding: 40 }}>Sin transcripción disponible.</div>
+              )}
+            </div>
+          )}
+
+          {raw && tab === "analysis" && (() => {
+            const analysis = raw.analysis ?? {};
+            const dcList: {data_collection_id:string;value:unknown;rationale:string}[] =
+              analysis.data_collection_results_list ?? Object.values(analysis.data_collection_results ?? {});
+            const evalList: {criteria_id:string;result:string;rationale:string}[] =
+              analysis.evaluation_criteria_results_list ?? Object.values(analysis.evaluation_criteria_results ?? {});
+            return (
+              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                {/* Summary */}
+                {analysis.transcript_summary && (
+                  <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: 16 }}>
+                    <div style={{ fontSize: 11, color: "var(--accent)", fontWeight: 600, marginBottom: 8, letterSpacing: "0.06em" }}>RESUMEN</div>
+                    <div style={{ fontSize: 13, lineHeight: 1.6, color: "var(--text)" }}>{analysis.transcript_summary}</div>
+                  </div>
+                )}
+                {/* Eval criteria */}
+                {evalList.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 10, letterSpacing: "0.06em" }}>CRITERIOS DE EVALUACIÓN</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {evalList.map((e, i) => (
+                        <div key={i} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 14px" }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                            <span style={{ fontSize: 12, fontWeight: 600 }}>{e.criteria_id}</span>
+                            <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4,
+                              background: e.result === "success" ? "rgba(34,211,163,0.12)" : "rgba(255,101,132,0.1)",
+                              color: e.result === "success" ? "var(--success)" : "var(--accent2)",
+                              fontFamily: "monospace",
+                            }}>{e.result}</span>
+                          </div>
+                          {e.rationale && <div style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.5 }}>{e.rationale}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Data collection */}
+                {dcList.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 10, letterSpacing: "0.06em" }}>DATOS RECOGIDOS</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {dcList.map((d, i) => (
+                        <div key={i} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 14px", display: "flex", gap: 12, alignItems: "flex-start" }}>
+                          <div style={{ fontSize: 11, color: "var(--muted)", minWidth: 120, fontFamily: "monospace" }}>{d.data_collection_id}</div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, color: d.value != null ? "var(--text)" : "var(--muted)", wordBreak: "break-word", fontFamily: d.value != null ? "inherit" : "monospace" }}>
+                              {d.value != null ? String(d.value) : "null"}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {raw && tab === "metadata" && (() => {
+            const meta = raw.metadata ?? {};
+            const pc = meta.phone_call ?? {};
+            const dv = raw.conversation_initiation_client_data?.dynamic_variables ?? {};
+            const rows: [string, string][] = [
+              ["ID conversación",   raw.conversation_id ?? "—"],
+              ["Agente",            raw.agent_name ?? raw.agent_id ?? "—"],
+              ["Estado",            raw.status ?? "—"],
+              ["Inicio",            meta.start_time_unix_secs ? new Date(meta.start_time_unix_secs * 1000).toLocaleString("es-ES") : "—"],
+              ["Duración total",    fmtSecs(meta.call_duration_secs ?? 0)],
+              ["Timbre",            meta.accepted_time_unix_secs && meta.start_time_unix_secs ? `${meta.accepted_time_unix_secs - meta.start_time_unix_secs}s` : "—"],
+              ["Finalización",      meta.termination_reason ?? "—"],
+              ["Dirección",         pc.direction ?? "—"],
+              ["Número agente",     pc.agent_number ?? "—"],
+              ["Número externo",    pc.external_number ?? dv.system__caller_id ?? "—"],
+              ["Tipo llamada",      pc.type ?? "—"],
+              ["Call SID",          pc.call_sid ?? "—"],
+              ["Idioma",            meta.main_language ?? "—"],
+              ["Fuente inicio",     meta.conversation_initiation_source ?? "—"],
+              ["Zona horaria",      meta.timezone ?? "—"],
+              ["Modelo LLM",        Object.keys(meta.charging?.llm_usage?.initiated_generation?.model_usage ?? {}).join(", ") || "—"],
+              ["Coste (créditos)",  meta.charging?.cost != null ? String(meta.charging.cost) : "—"],
+            ];
+            return (
+              <div style={{ display: "flex", flexDirection: "column", gap: 1, borderRadius: 10, overflow: "hidden", border: "1px solid var(--border)" }}>
+                {rows.map(([label, value], i) => (
+                  <div key={i} style={{ display: "flex", gap: 0, background: i % 2 === 0 ? "var(--surface)" : "rgba(255,255,255,0.02)" }}>
+                    <div style={{ padding: "9px 14px", minWidth: 160, fontSize: 11, color: "var(--muted)", fontWeight: 500, borderRight: "1px solid var(--border)", flexShrink: 0 }}>{label}</div>
+                    <div style={{ padding: "9px 14px", fontSize: 12, color: "var(--text)", fontFamily: "monospace", wordBreak: "break-all" }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {raw && tab === "raw" && (
+            <div style={{ position: "relative" }}>
+              <button onClick={() => navigator.clipboard.writeText(JSON.stringify(raw, null, 2))}
+                style={{ position: "absolute", top: 8, right: 8, background: "rgba(108,99,255,0.15)", border: "1px solid rgba(108,99,255,0.3)", borderRadius: 6, padding: "4px 10px", cursor: "pointer", color: "var(--accent)", fontSize: 11, zIndex: 1 }}>
+                Copiar
+              </button>
+              <pre style={{ margin: 0, padding: 16, background: "rgba(0,0,0,0.3)", borderRadius: 10, fontSize: 11, lineHeight: 1.5, color: "#a0a0c0", whiteSpace: "pre-wrap", wordBreak: "break-all", fontFamily: "monospace", border: "1px solid var(--border)" }}>
+                {JSON.stringify(raw, null, 2)}
+              </pre>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -397,6 +624,7 @@ export default function Home() {
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
   const [fetched, setFetched] = useState(false);
+  const [panelConvId, setPanelConvId] = useState<string | null>(null);
   const stats = useStats(conversations, grouping);
 
   const fetchQueues = useCallback(async () => {
@@ -707,7 +935,7 @@ export default function Home() {
                             const dt = new Date(c.start_time_unix_secs * 1000);
                             const q = getQueueForAgent(queues, c.agent_id);
                             return (
-                              <tr key={c.conversation_id} style={{ cursor: "pointer" }} onClick={() => toggleSelect(c.conversation_id)}>
+                              <tr key={c.conversation_id} style={{ cursor: "pointer" }} onClick={() => setPanelConvId(c.conversation_id)}>
                                 <td><input type="checkbox" checked={selected.has(c.conversation_id)} onChange={() => toggleSelect(c.conversation_id)} onClick={e => e.stopPropagation()} style={{ accentColor: "var(--accent)", width: 14, height: 14 }} /></td>
                                 <td className="mono" style={{ fontSize: 12 }}>{dt.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" })}</td>
                                 <td className="mono" style={{ fontSize: 12 }}>{dt.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</td>
@@ -758,6 +986,13 @@ export default function Home() {
           </>
         )}
       </main>
+      {panelConvId && (
+        <ConversationPanel
+          convId={panelConvId}
+          agentName={selectedAgent?.name ?? "Agente"}
+          onClose={() => setPanelConvId(null)}
+        />
+      )}
       <footer style={{ borderTop: "1px solid var(--border)", padding: "16px 24px", textAlign: "center", fontSize: 11, color: "var(--muted)", marginTop: 32 }}>
         <span className="mono">ElevenLabs Exporter</span> · Colas guardadas en Supabase
       </footer>
