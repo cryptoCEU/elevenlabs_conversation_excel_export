@@ -6,7 +6,7 @@ import {
   FileSpreadsheet, Loader2, ExternalLink, Calendar,
   ChevronDown, Search, BarChart2, TableProperties,
   Layers, Plus, Trash2, Check, X, Pencil, AlertCircle, Hash,
-  ChevronRight, FileJson, FileText, FlaskConical, Info,
+  ChevronRight, FileJson, FileText, FlaskConical, Info, LogOut,
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, LineChart, Line,
@@ -724,6 +724,12 @@ export default function Home() {
             <a href="https://elevenlabs.io/app/conversational-ai" target="_blank" rel="noopener noreferrer" className="btn-ghost" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
               ElevenLabs <ExternalLink size={12} />
             </a>
+            <button className="btn-ghost" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }} onClick={async () => {
+              await fetch("/api/auth/logout", { method: "POST" });
+              window.location.href = "/login";
+            }}>
+              <LogOut size={13} /> Salir
+            </button>
           </div>
         </div>
         <div className="max-w-7xl mx-auto px-6" style={{ display: "flex", borderTop: "1px solid var(--border)" }}>
