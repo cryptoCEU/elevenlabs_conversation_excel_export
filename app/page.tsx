@@ -160,7 +160,7 @@ function AgentDropdown({ agents, value, onChange }: { agents: Agent[]; value: Ag
         <ChevronDown size={14} style={{ flexShrink: 0, marginLeft: 8, color: "var(--muted)", transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
       </button>
       {open && (
-        <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, zIndex: 100, overflow: "hidden", boxShadow: "0 4px 24px rgba(30,29,22,0.1)" }}>
+        <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, zIndex: 1000, overflow: "hidden", boxShadow: "0 4px 24px rgba(30,29,22,0.1)" }}>
           {agents.map(a => (
             <button key={a.agent_id} onClick={() => { onChange(a); setOpen(false); }} style={{ width: "100%", padding: "10px 14px", textAlign: "left", background: value?.agent_id === a.agent_id ? "rgba(140,23,54,0.08)" : "transparent", color: value?.agent_id === a.agent_id ? "var(--accent)" : "var(--text)", border: "none", cursor: "pointer", fontSize: 13, fontFamily: "'Jost', sans-serif", borderBottom: "1px solid rgba(30,30,46,0.6)", display: "flex", alignItems: "center", gap: 8 }}>
               <Bot size={13} style={{ color: "var(--muted)", flexShrink: 0 }} />{a.name}
