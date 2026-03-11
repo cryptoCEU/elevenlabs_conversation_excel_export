@@ -38,25 +38,28 @@ export interface ConversationsResponse {
 // Primary:  metadata.phone_call.external_number / agent_number
 // Fallback: conversation_initiation_client_data.dynamic_variables.system__caller_id / system__called_number
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+function isPhone(v: unknown): v is string {
+  return typeof v === "string" && v.startsWith("+") && v.length >= 7;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractPhones(raw: any): { caller_phone: string; called_phone: string } {
   const pc = raw?.metadata?.phone_call;
   const dv = raw?.conversation_initiation_client_data?.dynamic_variables;
 
+  // Priority: phone_call block > dynamic_variables > user_id (only if real phone number)
   const caller_phone =
-    pc?.external_number ??
-    dv?.system__caller_id ??
-    raw?.user_id ??  // ElevenLabs also stores caller in user_id for phone calls
+    (isPhone(pc?.external_number) ? pc.external_number : null) ??
+    (isPhone(dv?.system__caller_id) ? dv.system__caller_id : null) ??
+    (isPhone(raw?.user_id) ? raw.user_id : null) ??
     "";
 
   const called_phone =
-    pc?.agent_number ??
-    dv?.system__called_number ??
+    (isPhone(pc?.agent_number) ? pc.agent_number : null) ??
+    (isPhone(dv?.system__called_number) ? dv.system__called_number : null) ??
     "";
 
-  return {
-    caller_phone: typeof caller_phone === "string" ? caller_phone : "",
-    called_phone: typeof called_phone === "string" ? called_phone : "",
-  };
+  return { caller_phone, called_phone };
 }
 
 // ── Numeric field extraction ──────────────────────────────────────────────────
@@ -91,18 +94,11 @@ export async function fetchConversationsPage(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const raw: any = await res.json();
 
-  // The list endpoint returns less detail than the detail endpoint.
-  // metadata.phone_call is not present, but user_id holds the caller number for phone calls.
+  // The list endpoint has less data than the detail endpoint.
+  // For phone calls, the caller number may appear in metadata.phone_call or user_id (if starts with +).
   const items: ConversationSummary[] = (raw.conversations ?? raw.items ?? []).map(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (c: any) => {
-      const phones = extractPhones(c);
-      // Fallback: for phone calls, ElevenLabs puts the caller number in user_id
-      if (!phones.caller_phone && typeof c.user_id === "string" && c.user_id.startsWith("+")) {
-        phones.caller_phone = c.user_id;
-      }
-      return { ...c, ...phones };
-    }
+    (c: any) => ({ ...c, ...extractPhones(c) })
   );
 
   return { conversations: items, has_more: raw.has_more ?? false, next_cursor: raw.next_cursor };
