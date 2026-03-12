@@ -26,7 +26,7 @@ interface ConversationSummary {
   ring_secs: number;
   ended_by: string;
 }
-type Grouping = "dia" | "semana" | "mes";
+type Grouping = "dia" | "semana" | "mes" | "hora";
 type RangePreset = "7d" | "30d" | "90d" | "custom";
 type MainTab = "datos" | "colas";
 
@@ -45,6 +45,7 @@ function presetDates(p: RangePreset) {
 }
 function groupKey(unix: number, g: Grouping) {
   const d = new Date(unix * 1000);
+  if (g === "hora") return `${String(d.getHours()).padStart(2, "0")}h`;
   if (g === "dia") return d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit" });
   if (g === "semana") {
     const t = new Date(d); t.setDate(t.getDate() - ((t.getDay() + 6) % 7));
@@ -54,6 +55,7 @@ function groupKey(unix: number, g: Grouping) {
 }
 function sortKey(unix: number, g: Grouping) {
   const d = new Date(unix * 1000);
+  if (g === "hora") return String(d.getHours()).padStart(2, "0");
   if (g === "dia") return toISO(d);
   if (g === "semana") { const t = new Date(d); t.setDate(t.getDate() - ((t.getDay() + 6) % 7)); return toISO(t); }
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -111,17 +113,20 @@ function ChartTooltip({ active, payload, label, unit = "" }: {
 function useStats(conversations: ConversationSummary[], grouping: Grouping) {
   return useMemo(() => {
     if (!conversations.length) return null;
-    const grouped: Record<string, { label: string; sk: string; total: number; durSum: number }> = {};
+    const grouped: Record<string, { label: string; sk: string; total: number; durSum: number; completadas: number; abandonadas: number }> = {};
     const byHour: Record<number, number> = {};
     const byStatus: Record<string, number> = {};
     const durBuckets: Record<string, number> = { "<1m": 0, "1-2m": 0, "2-5m": 0, "5-10m": 0, ">10m": 0 };
     for (const c of conversations) {
       const t = c.start_time_unix_secs, dur = c.call_duration_secs ?? 0;
       const label = groupKey(t, grouping), sk = sortKey(t, grouping), dt = new Date(t * 1000);
-      if (!grouped[sk]) grouped[sk] = { label, sk, total: 0, durSum: 0 };
-      grouped[sk].total++; grouped[sk].durSum += dur;
-      byHour[dt.getHours()] = (byHour[dt.getHours()] ?? 0) + 1;
+      if (!grouped[sk]) grouped[sk] = { label, sk, total: 0, durSum: 0, completadas: 0, abandonadas: 0 };
+      grouped[sk].total++;
+      grouped[sk].durSum += dur;
       const st = c.status?.toLowerCase() ?? "unknown";
+      if (["done", "completed"].includes(st)) grouped[sk].completadas++;
+      else if (["failed", "error"].includes(st)) grouped[sk].abandonadas++;
+      byHour[dt.getHours()] = (byHour[dt.getHours()] ?? 0) + 1;
       byStatus[st] = (byStatus[st] ?? 0) + 1;
       if (dur < 60) durBuckets["<1m"]++;
       else if (dur < 120) durBuckets["1-2m"]++;
@@ -130,7 +135,7 @@ function useStats(conversations: ConversationSummary[], grouping: Grouping) {
       else durBuckets[">10m"]++;
     }
     const groupedData = Object.values(grouped).sort((a, b) => a.sk.localeCompare(b.sk))
-      .map(v => ({ date: v.label, llamadas: v.total, durMedia: Math.round(v.durSum / v.total / 60 * 10) / 10 }));
+      .map(v => ({ date: v.label, total: v.total, completadas: v.completadas, abandonadas: v.abandonadas, durMedia: Math.round(v.durSum / v.total / 60 * 10) / 10 }));
     const hourData = Array.from({ length: 24 }, (_, h) => ({ hora: `${String(h).padStart(2, "0")}h`, llamadas: byHour[h] ?? 0 }));
     const statusData = Object.entries(byStatus).map(([name, value]) => ({ name, value }));
     const durData = Object.entries(durBuckets).map(([name, value]) => ({ name, value }));
@@ -640,6 +645,8 @@ export default function Home() {
   const [preset, setPreset] = useState<RangePreset>("30d");
   const [dateFrom, setDateFrom] = useState(presetDates("30d").from);
   const [dateTo, setDateTo] = useState(presetDates("30d").to);
+  const [hourFrom, setHourFrom] = useState<number>(0);
+  const [hourTo, setHourTo] = useState<number>(23);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loadingAgents, setLoadingAgents] = useState(false);
@@ -650,6 +657,14 @@ export default function Home() {
   const [fetched, setFetched] = useState(false);
   const [panelConvId, setPanelConvId] = useState<string | null>(null);
   const stats = useStats(conversations, grouping);
+  const filteredConversations = useMemo(() => {
+    if (hourFrom === 0 && hourTo === 23) return conversations;
+    return conversations.filter(c => {
+      const h = new Date(c.start_time_unix_secs * 1000).getHours();
+      return h >= hourFrom && h <= hourTo;
+    });
+  }, [conversations, hourFrom, hourTo]);
+  const filteredStats = useStats(filteredConversations, grouping);
 
   const fetchQueues = useCallback(async () => {
     setLoadingQueues(true);
@@ -817,17 +832,17 @@ export default function Home() {
               </div>
             </div>
 
-            {fetched && conversations.length > 0 && stats && (
+            {fetched && filteredConversations.length > 0 && filteredStats && (
               <>
                 <div className="fade-up" style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 12 }}>
                   {[
-                    { label: "TOTAL LLAMADAS", value: conversations.length, color: "var(--accent)" },
-                    { label: "COMPLETADAS", value: stats.completed, color: "var(--success)" },
-                    { label: "TASA ÉXITO", value: `${Math.round(stats.completed / conversations.length * 100)}%`, color: "var(--success)" },
-                    { label: "DURACIÓN MEDIA", value: fmt(stats.avgDur), color: "var(--accent)" },
-                    { label: "DURACIÓN MÁXIMA", value: fmt(stats.maxDur), color: "var(--warning)" },
-                    { label: "TOTAL MENSAJES", value: stats.totalMessages.toLocaleString("es-ES"), color: "var(--text)" },
-                    { label: "MENSAJES MEDIO", value: stats.avgMessages, color: "var(--muted)" },
+                    { label: "TOTAL LLAMADAS", value: filteredConversations.length, color: "var(--accent)" },
+                    { label: "COMPLETADAS", value: filteredStats.completed, color: "var(--success)" },
+                    { label: "TASA ÉXITO", value: `${Math.round(filteredStats.completed / filteredConversations.length * 100)}%`, color: "var(--success)" },
+                    { label: "DURACIÓN MEDIA", value: fmt(filteredStats.avgDur), color: "var(--accent)" },
+                    { label: "DURACIÓN MÁXIMA", value: fmt(filteredStats.maxDur), color: "var(--warning)" },
+                    { label: "TOTAL MENSAJES", value: filteredStats.totalMessages.toLocaleString("es-ES"), color: "var(--text)" },
+                    { label: "MENSAJES MEDIO", value: filteredStats.avgMessages, color: "var(--muted)" },
                   ].map(({ label, value, color }) => (
                     <div key={label} style={card({ padding: "16px 18px" })}>
                       <div style={{ fontSize: 10, color: "var(--muted)", letterSpacing: "0.08em", marginBottom: 8, fontFamily: "monospace" }}>{label}</div>
@@ -848,28 +863,65 @@ export default function Home() {
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <span style={{ fontSize: 11, color: "var(--muted)", fontFamily: "monospace" }}>AGRUPAR POR</span>
                       <div style={{ display: "flex", gap: 6 }}>
-                        {(["dia", "semana", "mes"] as Grouping[]).map(g => (
+                        {(["hora", "dia", "semana", "mes"] as Grouping[]).map(g => (
                           <Pill key={g} label={g.charAt(0).toUpperCase() + g.slice(1)} active={grouping === g} onClick={() => setGrouping(g)} />
                         ))}
                       </div>
                     </div>
                   )}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 11, color: "var(--muted)", fontFamily: "monospace" }}>HORA</span>
+                    <select className="input" value={hourFrom} onChange={e => setHourFrom(Number(e.target.value))} style={{ width: 70, padding: "5px 8px", fontSize: 12 }}>
+                      {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2,"0")}:00</option>)}
+                    </select>
+                    <span style={{ fontSize: 11, color: "var(--muted)" }}>—</span>
+                    <select className="input" value={hourTo} onChange={e => setHourTo(Number(e.target.value))} style={{ width: 70, padding: "5px 8px", fontSize: 12 }}>
+                      {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2,"0")}:59</option>)}
+                    </select>
+                    {(hourFrom !== 0 || hourTo !== 23) && (
+                      <button onClick={() => { setHourFrom(0); setHourTo(23); }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted)", fontSize: 11, padding: "2px 6px", borderRadius: 2 }}>✕ reset</button>
+                    )}
+                  </div>
                 </div>
 
                 {dataTab === "graficos" && (
                   <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    {/* New: Total / Completadas / Abandonadas grouped bar */}
+                    <div style={card({ padding: 24 })}>
+                      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Conversaciones por {grouping}</div>
+                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 16 }}>Total · Completadas · Abandonadas</div>
+                      <div style={{ display: "flex", gap: 20, marginBottom: 16 }}>
+                        {[{ label: "Total", color: "#C8B49A" }, { label: "Completadas", color: "#4A7A3A" }, { label: "Abandonadas", color: "#8C1736" }].map(l => (
+                          <div key={l.label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11 }}>
+                            <span style={{ width: 10, height: 10, borderRadius: 2, background: l.color, display: "inline-block" }}/>
+                            <span style={{ color: "var(--muted)" }}>{l.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <ResponsiveContainer width="100%" height={240}>
+                        <BarChart data={filteredStats.groupedData} barCategoryGap="25%" barGap={3}>
+                          <CartesianGrid stroke="rgba(200,180,154,0.2)" strokeDasharray="3 3" vertical={false}/>
+                          <XAxis dataKey="date" tick={{ fill: "var(--muted)", fontSize: 10 }} axisLine={false} tickLine={false}/>
+                          <YAxis tick={{ fill: "var(--muted)", fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false}/>
+                          <Tooltip content={<ChartTooltip unit=" conv"/>}/>
+                          <Bar dataKey="total" name="Total" fill="#C8B49A" radius={[3,3,0,0]}/>
+                          <Bar dataKey="completadas" name="Completadas" fill="#4A7A3A" radius={[3,3,0,0]}/>
+                          <Bar dataKey="abandonadas" name="Abandonadas" fill="#8C1736" radius={[3,3,0,0]}/>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                       <div style={card({ padding: 24 })}>
                         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Llamadas por {grouping}</div>
                         <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 20 }}>Volumen de conversaciones</div>
                         <ResponsiveContainer width="100%" height={220}>
-                          <AreaChart data={stats.groupedData}>
+                          <AreaChart data={filteredStats.groupedData}>
                             <defs><linearGradient id="gLL" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#8C1736" stopOpacity={0.15}/><stop offset="95%" stopColor="#8C1736" stopOpacity={0}/></linearGradient></defs>
                             <CartesianGrid stroke="#1e1e2e" strokeDasharray="3 3"/>
                             <XAxis dataKey="date" tick={{ fill:"#6b6b8a", fontSize:10 }} axisLine={false} tickLine={false}/>
                             <YAxis tick={{ fill:"#6b6b8a", fontSize:10 }} axisLine={false} tickLine={false}/>
                             <Tooltip content={<ChartTooltip unit=" llamadas"/>}/>
-                            <Area type="monotone" dataKey="llamadas" stroke="#8C1736" strokeWidth={2} fill="url(#gLL)"/>
+                            <Area type="monotone" dataKey="total" stroke="#8C1736" strokeWidth={2} fill="url(#gLL)"/>
                           </AreaChart>
                         </ResponsiveContainer>
                       </div>
@@ -877,7 +929,7 @@ export default function Home() {
                         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Duración media por {grouping}</div>
                         <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 20 }}>Minutos de media</div>
                         <ResponsiveContainer width="100%" height={220}>
-                          <LineChart data={stats.groupedData}>
+                          <LineChart data={filteredStats.groupedData}>
                             <CartesianGrid stroke="#1e1e2e" strokeDasharray="3 3"/>
                             <XAxis dataKey="date" tick={{ fill:"#6b6b8a", fontSize:10 }} axisLine={false} tickLine={false}/>
                             <YAxis tick={{ fill:"#6b6b8a", fontSize:10 }} axisLine={false} tickLine={false} unit="m"/>
@@ -892,12 +944,12 @@ export default function Home() {
                         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Llamadas por hora</div>
                         <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 20 }}>Distribución horaria</div>
                         <ResponsiveContainer width="100%" height={200}>
-                          <BarChart data={stats.hourData}>
+                          <BarChart data={filteredStats.hourData}>
                             <CartesianGrid stroke="#1e1e2e" strokeDasharray="3 3" vertical={false}/>
                             <XAxis dataKey="hora" tick={{ fill:"#6b6b8a", fontSize:9 }} axisLine={false} tickLine={false} interval={2}/>
                             <YAxis tick={{ fill:"#6b6b8a", fontSize:10 }} axisLine={false} tickLine={false}/>
                             <Tooltip content={<ChartTooltip unit=" llamadas"/>}/>
-                            <Bar dataKey="llamadas" radius={[4,4,0,0]}>{stats.hourData.map((e,i)=>{ const mx=Math.max(...stats.hourData.map(d=>d.llamadas)); return <Cell key={i} fill={e.llamadas===mx&&mx>0?"#8C1736":"#EAD9D0"}/>; })}</Bar>
+                            <Bar dataKey="llamadas" radius={[4,4,0,0]}>{filteredStats.hourData.map((e,i)=>{ const mx=Math.max(...filteredStats.hourData.map(d=>d.llamadas)); return <Cell key={i} fill={e.llamadas===mx&&mx>0?"#8C1736":"#EAD9D0"}/>; })}</Bar>
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
@@ -905,12 +957,12 @@ export default function Home() {
                         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Estado</div>
                         <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 16 }}>Resultado llamadas</div>
                         <ResponsiveContainer width="100%" height={160}>
-                          <PieChart><Pie data={stats.statusData} dataKey="value" cx="50%" cy="50%" outerRadius={65} innerRadius={35} paddingAngle={3}>
-                            {stats.statusData.map((e,i)=><Cell key={i} fill={STATUS_COLORS[e.name]??COLORS[i%COLORS.length]}/>)}
+                          <PieChart><Pie data={filteredStats.statusData} dataKey="value" cx="50%" cy="50%" outerRadius={65} innerRadius={35} paddingAngle={3}>
+                            {filteredStats.statusData.map((e,i)=><Cell key={i} fill={STATUS_COLORS[e.name]??COLORS[i%COLORS.length]}/>)}
                           </Pie><Tooltip content={<ChartTooltip unit=" llamadas"/>}/></PieChart>
                         </ResponsiveContainer>
                         <div style={{ display:"flex", flexDirection:"column", gap:4, marginTop:8 }}>
-                          {stats.statusData.map((s,i)=>(
+                          {filteredStats.statusData.map((s,i)=>(
                             <div key={i} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", fontSize:11 }}>
                               <div style={{ display:"flex", alignItems:"center", gap:6 }}><span style={{ width:8, height:8, borderRadius:"50%", background:STATUS_COLORS[s.name]??COLORS[i%COLORS.length], display:"inline-block" }}/><span style={{ color:"var(--muted)" }}>{s.name}</span></div>
                               <span style={{ fontFamily:"monospace" }}>{s.value}</span>
@@ -922,15 +974,15 @@ export default function Home() {
                         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Duración</div>
                         <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 16 }}>Por rangos</div>
                         <ResponsiveContainer width="100%" height={160}>
-                          <BarChart data={stats.durData} layout="vertical">
+                          <BarChart data={filteredStats.durData} layout="vertical">
                             <XAxis type="number" tick={{ fill:"#6b6b8a", fontSize:9 }} axisLine={false} tickLine={false}/>
                             <YAxis type="category" dataKey="name" tick={{ fill:"#6b6b8a", fontSize:10 }} axisLine={false} tickLine={false} width={36}/>
                             <Tooltip content={<ChartTooltip unit=" llamadas"/>}/>
-                            <Bar dataKey="value" radius={[0,4,4,0]}>{stats.durData.map((_,i)=><Cell key={i} fill={COLORS[i%COLORS.length]}/>)}</Bar>
+                            <Bar dataKey="value" radius={[0,4,4,0]}>{filteredStats.durData.map((_,i)=><Cell key={i} fill={COLORS[i%COLORS.length]}/>)}</Bar>
                           </BarChart>
                         </ResponsiveContainer>
                         <div style={{ display:"flex", flexDirection:"column", gap:4, marginTop:8 }}>
-                          {stats.durData.map((d,i)=>(
+                          {filteredStats.durData.map((d,i)=>(
                             <div key={i} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", fontSize:11 }}>
                               <div style={{ display:"flex", alignItems:"center", gap:6 }}><span style={{ width:8, height:8, borderRadius:2, background:COLORS[i%COLORS.length], display:"inline-block" }}/><span style={{ color:"var(--muted)" }}>{d.name}</span></div>
                               <span style={{ fontFamily:"monospace" }}>{d.value}</span>
@@ -944,23 +996,23 @@ export default function Home() {
                       <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Distribución de mensajes</div>
                       <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 20 }}>Nº de conversaciones por volumen de mensajes</div>
                       <ResponsiveContainer width="100%" height={200}>
-                        <BarChart data={stats.msgData} barCategoryGap="30%">
+                        <BarChart data={filteredStats.msgData} barCategoryGap="30%">
                           <CartesianGrid stroke="rgba(200,180,154,0.2)" strokeDasharray="3 3" vertical={false}/>
                           <XAxis dataKey="name" tick={{ fill: "var(--muted)", fontSize: 11 }} axisLine={false} tickLine={false}/>
                           <YAxis tick={{ fill: "var(--muted)", fontSize: 10 }} axisLine={false} tickLine={false}/>
                           <Tooltip content={<ChartTooltip unit=" conversaciones"/>}/>
                           <Bar dataKey="value" radius={[4,4,0,0]}>
-                            {stats.msgData.map((e, i) => {
-                              const mx = Math.max(...stats.msgData.map(d => d.value));
+                            {filteredStats.msgData.map((e, i) => {
+                              const mx = Math.max(...filteredStats.msgData.map(d => d.value));
                               return <Cell key={i} fill={e.value === mx && mx > 0 ? "#8C1736" : "#C8B49A"}/>;
                             })}
                           </Bar>
                         </BarChart>
                       </ResponsiveContainer>
                       <div style={{ display: "flex", gap: 20, marginTop: 12, flexWrap: "wrap" }}>
-                        {stats.msgData.map((d, i) => (
+                        {filteredStats.msgData.map((d, i) => (
                           <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11 }}>
-                            <span style={{ width: 8, height: 8, borderRadius: 2, background: d.value === Math.max(...stats.msgData.map(x => x.value)) && d.value > 0 ? "#8C1736" : "#C8B49A", display: "inline-block" }}/>
+                            <span style={{ width: 8, height: 8, borderRadius: 2, background: d.value === Math.max(...filteredStats.msgData.map(x => x.value)) && d.value > 0 ? "#8C1736" : "#C8B49A", display: "inline-block" }}/>
                             <span style={{ color: "var(--muted)" }}>{d.name} msg</span>
                             <span style={{ fontFamily: "monospace", color: "var(--text)" }}>{d.value}</span>
                           </div>
@@ -974,8 +1026,8 @@ export default function Home() {
                   <div style={card({ overflow: "hidden" })} className="fade-up">
                     <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <input type="checkbox" checked={allSelected} onChange={toggleAll} style={{ accentColor: "var(--accent)", width: 15, height: 15 }} />
-                        <span style={{ fontSize: 13, color: "var(--muted)" }}>{selected.size} de {conversations.length} seleccionadas</span>
+                        <input type="checkbox" checked={filteredConversations.length > 0 && filteredConversations.every(c => selected.has(c.conversation_id))} onChange={toggleAll} style={{ accentColor: "var(--accent)", width: 15, height: 15 }} />
+                        <span style={{ fontSize: 13, color: "var(--muted)" }}>{selected.size} de {filteredConversations.length} seleccionadas</span>
                       </div>
                       <button className="btn-success" onClick={exportExcel} disabled={exporting || selected.size === 0} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         {exporting ? <Loader2 size={14} className="spinner" /> : <Download size={14} />}
