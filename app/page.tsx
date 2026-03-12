@@ -138,7 +138,20 @@ function useStats(conversations: ConversationSummary[], grouping: Grouping) {
     const avgDur = Math.round(totalDur / conversations.length);
     const maxDur = Math.max(...conversations.map(c => c.call_duration_secs ?? 0));
     const completed = conversations.filter(c => ["done", "completed"].includes(c.status?.toLowerCase())).length;
-    return { groupedData, hourData, statusData, durData, avgDur, maxDur, completed };
+    const totalMessages = conversations.reduce((a, c) => a + (c.message_count ?? 0), 0);
+    const avgMessages = Math.round(totalMessages / conversations.length);
+    const msgBuckets: Record<string, number> = { "0": 0, "1-5": 0, "6-10": 0, "11-20": 0, "21-50": 0, ">50": 0 };
+    for (const c of conversations) {
+      const m = c.message_count ?? 0;
+      if (m === 0) msgBuckets["0"]++;
+      else if (m <= 5) msgBuckets["1-5"]++;
+      else if (m <= 10) msgBuckets["6-10"]++;
+      else if (m <= 20) msgBuckets["11-20"]++;
+      else if (m <= 50) msgBuckets["21-50"]++;
+      else msgBuckets[">50"]++;
+    }
+    const msgData = Object.entries(msgBuckets).map(([name, value]) => ({ name, value }));
+    return { groupedData, hourData, statusData, durData, avgDur, maxDur, completed, totalMessages, avgMessages, msgData };
   }, [conversations, grouping]);
 }
 
@@ -806,13 +819,15 @@ export default function Home() {
 
             {fetched && conversations.length > 0 && stats && (
               <>
-                <div className="fade-up" style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12 }}>
+                <div className="fade-up" style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 12 }}>
                   {[
                     { label: "TOTAL LLAMADAS", value: conversations.length, color: "var(--accent)" },
                     { label: "COMPLETADAS", value: stats.completed, color: "var(--success)" },
                     { label: "TASA ÉXITO", value: `${Math.round(stats.completed / conversations.length * 100)}%`, color: "var(--success)" },
                     { label: "DURACIÓN MEDIA", value: fmt(stats.avgDur), color: "var(--accent)" },
                     { label: "DURACIÓN MÁXIMA", value: fmt(stats.maxDur), color: "var(--warning)" },
+                    { label: "TOTAL MENSAJES", value: stats.totalMessages.toLocaleString("es-ES"), color: "var(--text)" },
+                    { label: "MENSAJES MEDIO", value: stats.avgMessages, color: "var(--muted)" },
                   ].map(({ label, value, color }) => (
                     <div key={label} style={card({ padding: "16px 18px" })}>
                       <div style={{ fontSize: 10, color: "var(--muted)", letterSpacing: "0.08em", marginBottom: 8, fontFamily: "monospace" }}>{label}</div>
@@ -922,6 +937,34 @@ export default function Home() {
                             </div>
                           ))}
                         </div>
+                      </div>
+                    </div>
+                    {/* Messages distribution chart */}
+                    <div style={card({ padding: 24 })}>
+                      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Distribución de mensajes</div>
+                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 20 }}>Nº de conversaciones por volumen de mensajes</div>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={stats.msgData} barCategoryGap="30%">
+                          <CartesianGrid stroke="rgba(200,180,154,0.2)" strokeDasharray="3 3" vertical={false}/>
+                          <XAxis dataKey="name" tick={{ fill: "var(--muted)", fontSize: 11 }} axisLine={false} tickLine={false}/>
+                          <YAxis tick={{ fill: "var(--muted)", fontSize: 10 }} axisLine={false} tickLine={false}/>
+                          <Tooltip content={<ChartTooltip unit=" conversaciones"/>}/>
+                          <Bar dataKey="value" radius={[4,4,0,0]}>
+                            {stats.msgData.map((e, i) => {
+                              const mx = Math.max(...stats.msgData.map(d => d.value));
+                              return <Cell key={i} fill={e.value === mx && mx > 0 ? "#8C1736" : "#C8B49A"}/>;
+                            })}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                      <div style={{ display: "flex", gap: 20, marginTop: 12, flexWrap: "wrap" }}>
+                        {stats.msgData.map((d, i) => (
+                          <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: 2, background: d.value === Math.max(...stats.msgData.map(x => x.value)) && d.value > 0 ? "#8C1736" : "#C8B49A", display: "inline-block" }}/>
+                            <span style={{ color: "var(--muted)" }}>{d.name} msg</span>
+                            <span style={{ fontFamily: "monospace", color: "var(--text)" }}>{d.value}</span>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
