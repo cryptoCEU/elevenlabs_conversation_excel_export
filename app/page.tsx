@@ -869,19 +869,6 @@ export default function Home() {
                       </div>
                     </div>
                   )}
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 11, color: "var(--muted)", fontFamily: "monospace" }}>HORA</span>
-                    <select className="input" value={hourFrom} onChange={e => setHourFrom(Number(e.target.value))} style={{ width: 70, padding: "5px 8px", fontSize: 12 }}>
-                      {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2,"0")}:00</option>)}
-                    </select>
-                    <span style={{ fontSize: 11, color: "var(--muted)" }}>—</span>
-                    <select className="input" value={hourTo} onChange={e => setHourTo(Number(e.target.value))} style={{ width: 70, padding: "5px 8px", fontSize: 12 }}>
-                      {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2,"0")}:59</option>)}
-                    </select>
-                    {(hourFrom !== 0 || hourTo !== 23) && (
-                      <button onClick={() => { setHourFrom(0); setHourTo(23); }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted)", fontSize: 11, padding: "2px 6px", borderRadius: 2 }}>✕ reset</button>
-                    )}
-                  </div>
                 </div>
 
                 {dataTab === "graficos" && (
