@@ -113,16 +113,17 @@ function ChartTooltip({ active, payload, label, unit = "" }: {
 function useStats(conversations: ConversationSummary[], grouping: Grouping) {
   return useMemo(() => {
     if (!conversations.length) return null;
-    const grouped: Record<string, { label: string; sk: string; total: number; durSum: number; completadas: number; abandonadas: number }> = {};
+    const grouped: Record<string, { label: string; sk: string; total: number; durSum: number; completadas: number; abandonadas: number; messages: number }> = {};
     const byHour: Record<number, number> = {};
     const byStatus: Record<string, number> = {};
     const durBuckets: Record<string, number> = { "<1m": 0, "1-2m": 0, "2-5m": 0, "5-10m": 0, ">10m": 0 };
     for (const c of conversations) {
       const t = c.start_time_unix_secs, dur = c.call_duration_secs ?? 0;
       const label = groupKey(t, grouping), sk = sortKey(t, grouping), dt = new Date(t * 1000);
-      if (!grouped[sk]) grouped[sk] = { label, sk, total: 0, durSum: 0, completadas: 0, abandonadas: 0 };
+      if (!grouped[sk]) grouped[sk] = { label, sk, total: 0, durSum: 0, completadas: 0, abandonadas: 0, messages: 0 };
       grouped[sk].total++;
       grouped[sk].durSum += dur;
+      grouped[sk].messages += c.message_count ?? 0;
       const st = c.status?.toLowerCase() ?? "unknown";
       if (["done", "completed"].includes(st)) grouped[sk].completadas++;
       else if (["failed", "error"].includes(st)) grouped[sk].abandonadas++;
@@ -135,7 +136,7 @@ function useStats(conversations: ConversationSummary[], grouping: Grouping) {
       else durBuckets[">10m"]++;
     }
     const groupedData = Object.values(grouped).sort((a, b) => a.sk.localeCompare(b.sk))
-      .map(v => ({ date: v.label, total: v.total, completadas: v.completadas, abandonadas: v.abandonadas, durMedia: Math.round(v.durSum / v.total / 60 * 10) / 10 }));
+      .map(v => ({ date: v.label, total: v.total, completadas: v.completadas, abandonadas: v.abandonadas, durMedia: Math.round(v.durSum / v.total / 60 * 10) / 10, mensajes: v.messages }));
     const hourData = Array.from({ length: 24 }, (_, h) => ({ hora: `${String(h).padStart(2, "0")}h`, llamadas: byHour[h] ?? 0 }));
     const statusData = Object.entries(byStatus).map(([name, value]) => ({ name, value }));
     const durData = Object.entries(durBuckets).map(([name, value]) => ({ name, value }));
@@ -980,31 +981,22 @@ export default function Home() {
                     </div>
                     {/* Messages distribution chart */}
                     <div style={card({ padding: 24 })}>
-                      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Distribución de mensajes</div>
-                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 20 }}>Nº de conversaciones por volumen de mensajes</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Mensajes por {grouping}</div>
+                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 20 }}>Total de mensajes por periodo</div>
                       <ResponsiveContainer width="100%" height={200}>
-                        <BarChart data={filteredStats.msgData} barCategoryGap="30%">
+                        <BarChart data={filteredStats.groupedData} barCategoryGap="30%">
                           <CartesianGrid stroke="rgba(200,180,154,0.2)" strokeDasharray="3 3" vertical={false}/>
-                          <XAxis dataKey="name" tick={{ fill: "var(--muted)", fontSize: 11 }} axisLine={false} tickLine={false}/>
-                          <YAxis tick={{ fill: "var(--muted)", fontSize: 10 }} axisLine={false} tickLine={false}/>
-                          <Tooltip content={<ChartTooltip unit=" conversaciones"/>}/>
-                          <Bar dataKey="value" radius={[4,4,0,0]}>
-                            {filteredStats.msgData.map((e, i) => {
-                              const mx = Math.max(...filteredStats.msgData.map(d => d.value));
-                              return <Cell key={i} fill={e.value === mx && mx > 0 ? "#8C1736" : "#C8B49A"}/>;
+                          <XAxis dataKey="date" tick={{ fill: "var(--muted)", fontSize: 11 }} axisLine={false} tickLine={false}/>
+                          <YAxis tick={{ fill: "var(--muted)", fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false}/>
+                          <Tooltip content={<ChartTooltip unit=" mensajes"/>}/>
+                          <Bar dataKey="mensajes" radius={[4,4,0,0]}>
+                            {filteredStats.groupedData.map((e, i) => {
+                              const mx = Math.max(...filteredStats.groupedData.map(d => d.mensajes));
+                              return <Cell key={i} fill={e.mensajes === mx && mx > 0 ? "#8C1736" : "#C8B49A"}/>;
                             })}
                           </Bar>
                         </BarChart>
                       </ResponsiveContainer>
-                      <div style={{ display: "flex", gap: 20, marginTop: 12, flexWrap: "wrap" }}>
-                        {filteredStats.msgData.map((d, i) => (
-                          <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11 }}>
-                            <span style={{ width: 8, height: 8, borderRadius: 2, background: d.value === Math.max(...filteredStats.msgData.map(x => x.value)) && d.value > 0 ? "#8C1736" : "#C8B49A", display: "inline-block" }}/>
-                            <span style={{ color: "var(--muted)" }}>{d.name} msg</span>
-                            <span style={{ fontFamily: "monospace", color: "var(--text)" }}>{d.value}</span>
-                          </div>
-                        ))}
-                      </div>
                     </div>
                   </div>
                 )}
